@@ -43,16 +43,23 @@ canvas{display:block;position:fixed;inset:0}
 #overlay{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.8s;background:linear-gradient(180deg,#0a0010 0%,#1a0a1e 40%,#2a1020 100%)}
 #overlay.hidden{opacity:0;pointer-events:none}
 
-/* BACKGROUND COVER - TEMPAT GAMBAR ANDA */
+/* ========== BACKGROUND COVER - PROPORSIONAL ========== */
 #coverBg{
   position:absolute;
   inset:0;
   z-index:0;
   background-image: url('cover.jpg');
-  background-size: cover;
+  /* 
+    COBA SALAH SATU DARI 3 OPTION DI BAWAH:
+    - contain: gambar utuh, ada ruang kosong di pinggir
+    - cover: gambar memenuhi layar (mungkin terpotong)
+    - 90% auto: ukuran proporsional 90% lebar
+  */
+  background-size: contain;        /* ← pilih ini untuk gambar utuh */
   background-position: center;
   background-repeat: no-repeat;
-  opacity:0.85;
+  background-color: #0a0010;       /* warna latar jika ada ruang kosong */
+  opacity: 0.85;
 }
 
 /* Overlay gelap agar teks terbaca */
@@ -60,7 +67,7 @@ canvas{display:block;position:fixed;inset:0}
   content:'';
   position:absolute;
   inset:0;
-  background:linear-gradient(180deg,rgba(10,0,16,0.3) 0%,rgba(10,0,16,0.6) 50%,rgba(10,0,16,0.85) 100%);
+  background:linear-gradient(180deg,rgba(10,0,16,0.2) 0%,rgba(10,0,16,0.5) 50%,rgba(10,0,16,0.85) 100%);
 }
 
 /* ========== KONTEN MENU ========== */
@@ -114,6 +121,28 @@ canvas{display:block;position:fixed;inset:0}
   .monkey-title .big{font-size:clamp(32px,9vw,50px)}
   .monkey-title .chinese{font-size:clamp(16px,3.5vw,24px)}
   .btn{min-width:150px;padding:12px 30px;font-size:clamp(14px,2.2vw,17px)}
+
+  /* ===== PENGATURAN COVER UNTUK HP ===== */
+  #coverBg {
+    background-size: 100% auto;    /* lebar penuh, tinggi proporsional */
+    background-position: top center;
+  }
+}
+
+/* ===== UKURAN LAYAR SEDANG (TABLET) ===== */
+@media(min-width:601px) and (max-width:1024px){
+  #coverBg {
+    background-size: contain;
+    background-position: center;
+  }
+}
+
+/* ===== LAYAR BESAR (DESKTOP) ===== */
+@media(min-width:1025px){
+  #coverBg {
+    background-size: contain;      /* atau 90% auto */
+    background-position: center;
+  }
 }
 </style>
 </head>
@@ -152,7 +181,7 @@ canvas{display:block;position:fixed;inset:0}
 
 <!-- ========== MENU UTAMA ========== -->
 <div id="overlay">
-  <!-- GAMBAR COVER - GANTI 'cover.jpg' DENGAN NAMA FILE ANDA -->
+  <!-- GAMBAR COVER -->
   <div id="coverBg"></div>
   
   <div id="menuContent">
@@ -188,7 +217,6 @@ canvas{display:block;position:fixed;inset:0}
 <script>
 // ============================================
 // SEMUA KODE GAME ADA DI SINI
-// (saya tulis ringkas agar tidak terlalu panjang)
 // ============================================
 
 // === CANVAS ===
