@@ -48,20 +48,21 @@ canvas{display:block;position:fixed;inset:0}
   position:absolute;
   inset:0;
   z-index:0;
-  background-image: url('https://z-cdn-media.chatglm.cn/files/92f1bb83-edd1-4c7b-bc33-a9d550893019.png?auth_key=1883829818-8c953d2090a742c0bc732171208c18cf-0-84b4a863f817d51cae6ad0f610073f96');
-  background-size: cover;          /* Gambar memenuhi layar */
-  background-position: center top; /* Fokus gambar di tengah-atas */
+  /* Menggunakan URL Raw GitHub agar gambar bisa dimuat */
+  background-image: url('https://raw.githubusercontent.com/tokoblotongan/monkey_legend/main/cover.jpg');
+  background-size: contain;          /* Mencegah gambar terpotong */
+  background-position: center center;/* Memusatkan gambar */
   background-repeat: no-repeat;
-  background-color: #0a0010;       /* warna latar jika ada ruang kosong */
+  background-color: #0a0010;         /* Warna latar jika ada ruang kosong */
   opacity: 1;
 }
 
-/* Overlay gelap di bawah agar teks/UI terbaca */
+/* Overlay gradient agar UI di bawah terbaca tanpa menggelapkan gambar secara berlebihan */
 #coverBg::after{
   content:'';
   position:absolute;
   inset:0;
-  background:linear-gradient(180deg,rgba(10,0,16,0) 40%,rgba(10,0,16,0.6) 70%,rgba(10,0,16,1) 100%);
+  background:linear-gradient(180deg,rgba(10,0,16,0) 50%,rgba(10,0,16,0.4) 80%,rgba(10,0,16,0.95) 100%);
 }
 
 /* ========== KONTEN MENU ========== */
@@ -82,9 +83,9 @@ canvas{display:block;position:fixed;inset:0}
 .enter-hint{color:var(--gold);font-family:'Fredoka One',cursive;font-size:clamp(12px,1.8vw,16px);margin:0 0 16px;animation:pulse 1.5s ease-in-out infinite;text-shadow:0 2px 10px rgba(0,0,0,0.8)}
 @keyframes pulse{0%,100%{opacity:0.5;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
 
-.btn{pointer-events:all;font-family:'Fredoka One',cursive;font-size:clamp(16px,2.5vw,20px);padding:14px 50px;border:none;border-radius:50px;cursor:pointer;color:#1a0a1e;background:linear-gradient(135deg,#FFD700,#FF8C00);box-shadow:0 4px 30px rgba(255,140,0,0.5),inset 0 -3px 0 rgba(139,69,19,0.3);transition:all 0.3s;position:relative;overflow:hidden;min-width:200px;opacity:0.9} /* Transparent 10% */
+.btn{pointer-events:all;font-family:'Fredoka One',cursive;font-size:clamp(16px,2.5vw,20px);padding:14px 50px;border:none;border-radius:50px;cursor:pointer;color:#1a0a1e;background:linear-gradient(135deg,#FFD700,#FF8C00);box-shadow:0 4px 30px rgba(255,140,0,0.5),inset 0 -3px 0 rgba(139,69,19,0.3);transition:all 0.3s;position:relative;overflow:hidden;min-width:200px;opacity:0.5} /* Transparent 50% */
 .btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.25),transparent);pointer-events:none}
-.btn:hover{transform:scale(1.05);box-shadow:0 6px 45px rgba(255,140,0,0.7);opacity:1} /* Saat dihover jadi full opaque */
+.btn:hover{transform:scale(1.05);box-shadow:0 6px 45px rgba(255,140,0,0.7);opacity:0.7} /* Saat dihover opacity naik jadi 70% */
 .btn:active{transform:scale(0.95)}
 
 .ctrls{margin-top:18px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;padding:0 12px}
@@ -117,24 +118,24 @@ canvas{display:block;position:fixed;inset:0}
 
   /* ===== PENGATURAN COVER UNTUK HP ===== */
   #coverBg {
-    background-size: 100% auto;    /* lebar penuh, tinggi proporsional */
-    background-position: top center;
+    background-size: contain;    /* Tetap utuh tanpa terpotong di HP */
+    background-position: center center;
   }
 }
 
 /* ===== UKURAN LAYAR SEDANG (TABLET) ===== */
 @media(min-width:601px) and (max-width:1024px){
   #coverBg {
-    background-size: cover;
-    background-position: center;
+    background-size: contain;
+    background-position: center center;
   }
 }
 
 /* ===== LAYAR BESAR (DESKTOP) ===== */
 @media(min-width:1025px){
   #coverBg {
-    background-size: cover;      
-    background-position: center;
+    background-size: contain;      
+    background-position: center center;
   }
 }
 </style>
