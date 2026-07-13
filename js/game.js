@@ -269,12 +269,28 @@ addEventListener('mouseup', function(e) { if (e.button === 0) mouseState.leftCli
 
 // === KEYBOARD ===
 addEventListener('keydown', function(e) {
-    keys[e.key.toLowerCase()] = true;
-    if (e.key === 'Enter') { e.preventDefault(); if (state === 'menu') startGame();
-        else if (state === 'over') restartGame(); }
-    if (['w', 'a', 's', 'd', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(e.key.toLowerCase()) >= 0) e.preventDefault();
+    var key = e.key.toLowerCase();
+    keys[key] = true;
+    
+    // Tangani Enter
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (state === 'menu') {
+            if (typeof initAudio === 'function') initAudio();
+            startGame();
+        } else if (state === 'over') {
+            if (typeof initAudio === 'function') initAudio();
+            restartGame();
+        }
+        return;
+    }
+    
+    if (['w', 'a', 's', 'd', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(key) >= 0) e.preventDefault();
 });
-addEventListener('keyup', function(e) { keys[e.key.toLowerCase()] = false; });
+addEventListener('keyup', function(e) { 
+    var key = e.key.toLowerCase();
+    keys[key] = false; 
+});
 
 // === TOUCH ===
 var touchState = { moveX: 0, moveY: 0, jump: false, atk: false, kame: false, cloud: false, down: false };
@@ -410,7 +426,10 @@ document.addEventListener('touchmove', function(e) { if (state === 'play') e.pre
 
 // === MULAI GAME ===
 function startGame() {
-    initAudio();
+    // Pastikan audio aktif
+    if (typeof initAudio === 'function') {
+        try { initAudio(); } catch(e) {}
+    }
     initGame();
     state = 'play';
     window.state = state;
@@ -419,6 +438,10 @@ function startGame() {
 }
 
 function restartGame() {
+    // Pastikan audio aktif
+    if (typeof initAudio === 'function') {
+        try { initAudio(); } catch(e) {}
+    }
     initGame();
     state = 'play';
     window.state = state;
@@ -426,12 +449,24 @@ function restartGame() {
     if (isTouchDevice) document.getElementById('touchControls').classList.add('show');
 }
 
-document.getElementById('startBtn').addEventListener('click', startGame);
-document.getElementById('startBtn').addEventListener('touchend', function(e) { e.preventDefault();
-    startGame(); });
-document.getElementById('restartBtn').addEventListener('click', restartGame);
-document.getElementById('restartBtn').addEventListener('touchend', function(e) { e.preventDefault();
-    restartGame(); });
+document.getElementById('startBtn').addEventListener('click', function(e) {
+    if (typeof initAudio === 'function') initAudio();
+    startGame();
+});
+document.getElementById('startBtn').addEventListener('touchend', function(e) { 
+    e.preventDefault();
+    if (typeof initAudio === 'function') initAudio();
+    startGame(); 
+});
+document.getElementById('restartBtn').addEventListener('click', function(e) {
+    if (typeof initAudio === 'function') initAudio();
+    restartGame();
+});
+document.getElementById('restartBtn').addEventListener('touchend', function(e) { 
+    e.preventDefault();
+    if (typeof initAudio === 'function') initAudio();
+    restartGame(); 
+});
 
 // === PLATFORM ===
 function makePlat(x, y, w, type) {
@@ -704,20 +739,4 @@ function activateCloud() {
     player.cloudTimer = 220;
     player.vy = 0;
     sfxCloud();
-    spawnP(player.x, player.y + PH / 2, 10, '#FFF8DC', 0.9, 0.7);
-    
-    // Partikel dari cloud.js
-    if (typeof spawnCloudParticles === 'function') {
-        spawnCloudParticles(player);
-    }
-}
-window.activateCloud = activateCloud;
-
-// === PARTIKEL ===
-function spawnP(x, y, n, col, sm, szm) {
-    sm = sm || 1;
-    szm = szm || 1;
-    for (var i = 0; i < n; i++) {
-        var a = rnd(0, 6.28),
-            sp = rnd(1, 5) * sm;
-        particles.push({ x: x, y: y, vx: Math.cos(a) * sp
+   
