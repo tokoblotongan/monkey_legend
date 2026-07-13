@@ -24,11 +24,13 @@ window.C = C;
 var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 window.isTouchDevice = isTouchDevice;
 
-// === SPRITE SHEET ===
+// ============================================
+// SPRITE SHEET LOADER & PROCESSOR
+// ============================================
 var spriteData = null;
 var spriteReady = false;
 var SPRITE_SCALE = 1.0;
-var SPRITE_URL = 'https://raw.githubusercontent.com/tokoblotongan/monkey_legend/main/assets/images/Lari%20hadap%20depan.png';
+var SPRITE_URL = 'assets/images/Lari%20hadap%20depan.png';
 
 function calcSpriteScale() {
     if (!spriteData) return 1.0;
@@ -112,6 +114,9 @@ function processSpriteSheet(img) {
     return { img: img, frames: frames, sourceH: maxH };
 }
 
+// ============================================
+// LOAD SPRITE SHEET + CLOUD
+// ============================================
 function loadSpriteSheet() {
     return new Promise(function(resolve, reject) {
         var img = new Image();
@@ -123,13 +128,12 @@ function loadSpriteSheet() {
         loadText.classList.add('show');
         loadFill.style.width = '20%';
 
-        img.onload = function() {
-            loadFill.style.width = '60%';
-            loadText.textContent = 'Memproses sprite...';
-            setTimeout(function() {
-                spriteData = processSpriteSheet(img);
-                SPRITE_SCALE = calcSpriteScale();
-                spriteReady = true;
+        var loadedCount = 0;
+        var totalToLoad = 2; // sprite + cloud
+
+        function checkComplete() {
+            loadedCount++;
+            if (loadedCount >= totalToLoad) {
                 loadFill.style.width = '100%';
                 loadText.textContent = 'Siap!';
                 setTimeout(function() {
@@ -137,29 +141,52 @@ function loadSpriteSheet() {
                     loadText.classList.remove('show');
                 }, 400);
                 resolve();
+            }
+        }
+
+        // Muat sprite karakter
+        img.onload = function() {
+            loadFill.style.width = '40%';
+            loadText.textContent = 'Memproses sprite...';
+            setTimeout(function() {
+                spriteData = processSpriteSheet(img);
+                SPRITE_SCALE = calcSpriteScale();
+                spriteReady = true;
+                loadFill.style.width = '60%';
+                checkComplete();
             }, 100);
         };
         img.onerror = function() {
-            loadText.textContent = 'Gagal memuat, gunakan karakter cadangan';
-            loadFill.style.width = '100%';
-            loadFill.style.background = '#FF4444';
-            setTimeout(function() {
-                loadBar.classList.remove('show');
-                loadText.classList.remove('show');
-            }, 1500);
-            resolve();
+            loadText.textContent = 'Gagal memuat karakter';
+            checkComplete();
         };
         img.src = SPRITE_URL;
+
+        // Muat gambar awan dari cloud.js
+        if (typeof loadCloudImage === 'function') {
+            loadCloudImage().then(function() {
+                loadFill.style.width = '80%';
+                loadText.textContent = 'Memuat awan...';
+                checkComplete();
+            }).catch(function() {
+                checkComplete();
+            });
+        } else {
+            // Jika cloud.js tidak dimuat, tetap lanjut
+            checkComplete();
+        }
     });
 }
 
-// === AUDIO ===
+// ============================================
+// AUDIO
+// ============================================
 var ac;
 function initAudio() { if (!ac) try { ac = new(window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
 window.ac = ac;
 window.initAudio = initAudio;
 
-// Sound effects (di-ekspose ke global)
+// Sound effects
 window.sfxJump = function() { tone(300, 0.15, 'sine', 0.1, 600); };
 window.sfxAtk = function() { tone(500, 0.08, 'sawtooth', 0.08, 250); };
 window.sfxKame = function() {
@@ -175,6 +202,11 @@ window.sfxCoin = function() {
 window.sfxCloud = function() { tone(600, 0.3, 'sine', 0.09, 900); };
 window.sfxGhost = function() { tone(80, 0.5, 'sine', 0.05, 40); };
 window.sfxDie = function() { tone(400, 0.6, 'sawtooth', 0.1, 50); };
+
+// === UTILITAS ===
+function rnd(a, b) { return Math.random() * (b - a) + a; }
+function rndI(a, b) { return Math.floor(rnd(a, b + 1)); }
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 
 // === STATE ===
 var state = 'menu',
@@ -673,6 +705,11 @@ function activateCloud() {
     player.vy = 0;
     sfxCloud();
     spawnP(player.x, player.y + PH / 2, 10, '#FFF8DC', 0.9, 0.7);
+    
+    // Partikel dari cloud.js
+    if (typeof spawnCloudParticles === 'function') {
+        spawnCloudParticles(player);
+    }
 }
 window.activateCloud = activateCloud;
 
@@ -683,553 +720,4 @@ function spawnP(x, y, n, col, sm, szm) {
     for (var i = 0; i < n; i++) {
         var a = rnd(0, 6.28),
             sp = rnd(1, 5) * sm;
-        particles.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - rnd(0, 2), life: rnd(15, 38), ml: 38, size: rnd(2, 6) * szm, color: col });
-    }
-}
-window.spawnP = spawnP;
-
-// === GEMPA ===
-function triggerShake(i, t) { shake.i = Math.max(shake.i, i);
-    shake.t = Math.max(shake.t, t); }
-window.triggerShake = triggerShake;
-
-function triggerQuake() {
-    triggerShake(20, 100);
-    sfxQuake();
-    document.getElementById('qf').classList.add('on');
-    setTimeout(function() { document.getElementById('qf').classList.remove('on'); }, 600);
-    for (var i = 0; i < platforms.length; i++) {
-        var p = platforms[i];
-        if (p.x + p.w > cam.x - 50 && p.x < cam.x + W + 50) {
-            for (var j = 0; j < 4; j++) particles.push({ x: p.x + rnd(0, p.w), y: p.y, vx: rnd(-3, 3), vy: rnd(-4, -1), life: rnd(20, 45), ml: 45, size: rnd(3, 7), color: pick(['#8B7355', '#A0926B', '#6B5B3A']) });
-        }
-    }
-    for (var i = 0; i < ghosts.length; i++) { ghosts[i].hp -= 1;
-        ghosts[i].hitFlash = 5; }
-    if (player.onGround) player.vy = -4;
-}
-
-// ============================================
-// DRAW PLAYER — SPRITE SHEET VERSION
-// ============================================
-function drawPlayer() {
-    var p = player,
-        sx = p.x - cam.x,
-        sy = p.y - cam.y;
-    if (sx < -100 || sx > W + 100) return;
-    if (p.inv > 0 && Math.floor(p.inv / 3) % 2 === 0) return;
-
-    X.save();
-    X.translate(sx, sy);
-
-    // Efek awan di bawah karakter
-    if (p.onCloud) {
-        X.save();
-        var cy = PH / 2 - 2;
-        X.beginPath();
-        X.arc(-10, cy, 11, 0, 6.28);
-        X.arc(10, cy, 11, 0, 6.28);
-        X.arc(0, cy - 4, 13, 0, 6.28);
-        X.fillStyle = 'rgba(255,250,242,0.85)';
-        X.fill();
-        var cg = X.createRadialGradient(0, cy, 4, 0, cy, 22);
-        cg.addColorStop(0, 'rgba(255,250,240,0.5)');
-        cg.addColorStop(1, 'rgba(255,240,220,0)');
-        X.beginPath();
-        X.arc(0, cy, 22, 0, 6.28);
-        X.fillStyle = cg;
-        X.fill();
-        X.restore();
-    }
-
-    // Efek Kamehameha charge
-    if (p.kameCharge > 5) {
-        var cp = p.kameCharge / 60;
-        var cg2 = X.createRadialGradient(PW * 0.3, 0, 2, PW * 0.3, 0, 18 + cp * 28);
-        cg2.addColorStop(0, 'rgba(200,255,255,' + cp * 0.8 + ')');
-        cg2.addColorStop(0.4, 'rgba(0,229,255,' + cp * 0.5 + ')');
-        cg2.addColorStop(1, 'rgba(0,100,200,0)');
-        X.beginPath();
-        X.arc(PW * 0.3, 0, 18 + cp * 28, 0, 6.28);
-        X.fillStyle = cg2;
-        X.fill();
-        X.beginPath();
-        X.arc(PW * 0.4, -PH * 0.08, 5 + cp * 7, 0, 6.28);
-        var bg2 = X.createRadialGradient(PW * 0.4, -PH * 0.08, 0, PW * 0.4, -PH * 0.08, 5 + cp * 7);
-        bg2.addColorStop(0, 'rgba(255,255,255,' + cp + ')');
-        bg2.addColorStop(0.5, 'rgba(0,229,255,' + cp * 0.7 + ')');
-        bg2.addColorStop(1, 'rgba(0,100,255,' + cp * 0.3 + ')');
-        X.fillStyle = bg2;
-        X.fill();
-    }
-
-    // Gambar Sprite
-    if (spriteReady && spriteData) {
-        var isMoving = Math.abs(p.vx) > 0.5 && p.onGround;
-        var isInAir = !p.onGround && !p.onCloud;
-
-        if (isMoving) {
-            spriteAnimTimer += SPRITE_FPS / 60;
-            if (spriteAnimTimer >= 1) {
-                spriteAnimTimer -= 1;
-                currentSpriteFrame = (currentSpriteFrame + 1) % 4;
-            }
-        } else if (isInAir) {
-            currentSpriteFrame = 2;
-            spriteAnimTimer = 0;
-        } else {
-            currentSpriteFrame = 0;
-            spriteAnimTimer = 0;
-        }
-
-        var fr = spriteData.frames[currentSpriteFrame];
-        if (fr) {
-            var sc = SPRITE_SCALE;
-            var drawW = fr.w * sc;
-            var drawH = fr.h * sc;
-            var drawX = -fr.ox * sc;
-            var drawY = (PH / 2) - fr.oy * sc;
-
-            X.save();
-            if (p.facing === -1) {
-                X.scale(-1, 1);
-                drawX = -drawX - drawW;
-            }
-
-            // Bayangan
-            X.save();
-            X.globalAlpha = 0.2;
-            X.beginPath();
-            X.ellipse(0, PH / 2 + 2, drawW * 0.35, 4, 0, 0, 6.28);
-            X.fillStyle = '#000';
-            X.fill();
-            X.restore();
-
-            X.drawImage(spriteData.img, fr.x, fr.y, fr.w, fr.h, drawX, drawY, drawW, drawH);
-            X.restore();
-        }
-    } else {
-        // FALLBACK: Karakter canvas
-        X.scale(p.facing, 1);
-        X.fillStyle = '#DAA520';
-        X.fillRect(-7, PH * 0.12, 6, 13);
-        X.fillRect(2, PH * 0.12, 6, 13);
-        X.fillStyle = '#333';
-        X.fillRect(-8, PH * 0.12 + 9, 8, 5);
-        X.fillRect(1, PH * 0.12 + 9, 8, 5);
-        X.beginPath();
-        X.rect(-PW * 0.38, -PH * 0.13, PW * 0.76, PH * 0.32);
-        var bodyG = X.createLinearGradient(0, -PH * 0.13, 0, PH * 0.19);
-        bodyG.addColorStop(0, '#FFD700');
-        bodyG.addColorStop(1, '#CC8800');
-        X.fillStyle = bodyG;
-        X.fill();
-        X.beginPath();
-        X.arc(0, -PH * 0.28, 12, 0, 6.28);
-        var headG = X.createRadialGradient(-2, -PH * 0.31, 2, 0, -PH * 0.28, 12);
-        headG.addColorStop(0, '#FFE4C4');
-        headG.addColorStop(1, '#DEB887');
-        X.fillStyle = headG;
-        X.fill();
-        X.fillStyle = '#FF4500';
-        for (var i = -2; i <= 2; i++) { X.beginPath();
-            X.moveTo(i * 4.5 - 1.5, -PH * 0.28 - 11);
-            X.lineTo(i * 4.5, -PH * 0.28 - 11 - (i === 0 ? 9 : 5.5));
-            X.lineTo(i * 4.5 + 1.5, -PH * 0.28 - 11);
-            X.fill(); }
-        X.fillStyle = '#FFF';
-        X.beginPath();
-        X.ellipse(-4.5, -PH * 0.3, 3.5, 3, 0, 0, 6.28);
-        X.fill();
-        X.beginPath();
-        X.ellipse(4.5, -PH * 0.3, 3.5, 3, 0, 0, 6.28);
-        X.fill();
-        X.fillStyle = '#000';
-        X.beginPath();
-        X.arc(-3.5, -PH * 0.29, 1, 0, 6.28);
-        X.fill();
-        X.beginPath();
-        X.arc(5.5, -PH * 0.29, 1, 0, 6.28);
-        X.fill();
-    }
-
-    // Glow awan
-    if (p.onCloud) {
-        var ag = X.createRadialGradient(0, 0, PW * 0.3, 0, 0, PW * 1.1);
-        ag.addColorStop(0, 'rgba(255,215,0,0.12)');
-        ag.addColorStop(1, 'rgba(255,215,0,0)');
-        X.beginPath();
-        X.arc(0, 0, PW * 1.1, 0, 6.28);
-        X.fillStyle = ag;
-        X.fill();
-    }
-
-    X.restore();
-}
-
-// === DRAW PLATFORM ===
-function drawPlatform(pl) {
-    var sx = pl.x - cam.x,
-        sy = pl.y - cam.y;
-    if (sx + pl.w < -50 || sx > W + 50) return;
-    X.save();
-    if (pl.type === 'ground') {
-        X.fillStyle = '#8B6914';
-        X.fillRect(sx, sy, pl.w, pl.h + 200);
-        X.fillStyle = '#4CAF50';
-        X.fillRect(sx, sy, pl.w, 5);
-        X.fillStyle = '#66BB6A';
-        X.fillRect(sx, sy, pl.w, 2.5);
-        X.fillStyle = 'rgba(0,0,0,0.08)';
-        for (var i = 0; i < pl.w; i += 28) { X.fillRect(sx + i, sy + 8, 14, 2.5);
-            X.fillRect(sx + i + 8, sy + 22, 11, 2.5); }
-    } else if (pl.type === 'candy') {
-        X.beginPath();
-        if (X.roundRect) X.roundRect(sx, sy, pl.w, pl.h, 5);
-        else X.rect(sx, sy, pl.w, pl.h);
-        var cg = X.createLinearGradient(sx, sy, sx, sy + pl.h);
-        cg.addColorStop(0, '#FF9ED8');
-        cg.addColorStop(1, '#CC6699');
-        X.fillStyle = cg;
-        X.fill();
-        X.strokeStyle = '#FF69B4';
-        X.lineWidth = 1.2;
-        X.stroke();
-        for (var i = 0; i < pl.w; i += 18) { X.fillStyle = 'rgba(255,255,255,0.25)';
-            X.fillRect(sx + i, sy, 9, pl.h); }
-    } else if (pl.type === 'chocolate') {
-        X.beginPath();
-        if (X.roundRect) X.roundRect(sx, sy, pl.w, pl.h, 5);
-        else X.rect(sx, sy, pl.w, pl.h);
-        var chg = X.createLinearGradient(sx, sy, sx, sy + pl.h);
-        chg.addColorStop(0, '#8B4513');
-        chg.addColorStop(1, '#5C2E00');
-        X.fillStyle = chg;
-        X.fill();
-        X.strokeStyle = '#6B3410';
-        X.lineWidth = 1.2;
-        X.stroke();
-        for (var i = 8; i < pl.w; i += 22) { X.fillStyle = 'rgba(139,90,43,0.35)';
-            X.fillRect(sx + i, sy + 2, 10, pl.h - 4); }
-    } else if (pl.type === 'ice') {
-        X.beginPath();
-        if (X.roundRect) X.roundRect(sx, sy, pl.w, pl.h, 5);
-        else X.rect(sx, sy, pl.w, pl.h);
-        var ig = X.createLinearGradient(sx, sy, sx, sy + pl.h);
-        ig.addColorStop(0, '#B3E5FC');
-        ig.addColorStop(1, '#4FC3F7');
-        X.fillStyle = ig;
-        X.fill();
-        X.strokeStyle = '#29B6F6';
-        X.lineWidth = 1.2;
-        X.stroke();
-        X.fillStyle = 'rgba(255,255,255,0.45)';
-        X.fillRect(sx + 4, sy + 2.5, 13, 2.5);
-        X.fillRect(sx + pl.w - 22, sy + 4, 10, 2);
-    }
-    if (pl.hasFlower && pl.type !== 'ground') {
-        var fx = sx + pl.w * 0.5,
-            fy = sy - 11;
-        X.fillStyle = '#228B22';
-        X.fillRect(fx - 0.8, fy, 1.6, 11);
-        var fc = pick(['#FF6B6B', '#FFD700', '#FF69B4', '#9D6BFF']);
-        for (var i = 0; i < 5; i++) {
-            var a = (i / 5) * 6.28 + frame * 0.01;
-            X.beginPath();
-            X.arc(fx + Math.cos(a) * 4.5, fy + Math.sin(a) * 4.5, 3, 0, 6.28);
-            X.fillStyle = fc;
-            X.fill();
-        }
-        X.beginPath();
-        X.arc(fx, fy, 2.5, 0, 6.28);
-        X.fillStyle = '#FFD700';
-        X.fill();
-    }
-    X.restore();
-}
-
-function drawCoin(c) {
-    if (c.collected) return;
-    var sx = c.x - cam.x,
-        sy = c.y - cam.y + Math.sin(frame * 0.06 + c.bob) * 3.5;
-    if (sx < -15 || sx > W + 15) return;
-    var scX = Math.abs(Math.cos(frame * 0.05 + c.bob));
-    X.save();
-    X.translate(sx, sy);
-    X.scale(Math.max(0.2, scX), 1);
-    X.beginPath();
-    X.arc(0, 0, 8, 0, 6.28);
-    var cg = X.createRadialGradient(-1.5, -1.5, 1, 0, 0, 8);
-    cg.addColorStop(0, '#FFF8B0');
-    cg.addColorStop(0.5, '#FFD700');
-    cg.addColorStop(1, '#CC8800');
-    X.fillStyle = cg;
-    X.fill();
-    X.strokeStyle = '#B8860B';
-    X.lineWidth = 0.8;
-    X.stroke();
-    X.fillStyle = 'rgba(139,69,19,0.45)';
-    X.font = 'bold 9px Fredoka One';
-    X.textAlign = 'center';
-    X.textBaseline = 'middle';
-    X.fillText('$', 0, 0.5);
-    X.restore();
-}
-
-function drawSky() {
-    var sg = X.createLinearGradient(0, 0, 0, H);
-    sg.addColorStop(0, '#FFE0F0');
-    sg.addColorStop(0.3, '#F8D0FF');
-    sg.addColorStop(0.6, '#C8E8FF');
-    sg.addColorStop(1, '#B0FFD0');
-    X.fillStyle = sg;
-    X.fillRect(0, 0, W, H);
-    var sunX = W * 0.85 - cam.x * 0.02,
-        sunY = H * 0.1;
-    var sunG = X.createRadialGradient(sunX, sunY, 12, sunX, sunY, 70);
-    sunG.addColorStop(0, 'rgba(255,230,100,0.45)');
-    sunG.addColorStop(0.5, 'rgba(255,200,80,0.08)');
-    sunG.addColorStop(1, 'rgba(255,200,80,0)');
-    X.beginPath();
-    X.arc(sunX, sunY, 70, 0, 6.28);
-    X.fillStyle = sunG;
-    X.fill();
-    X.beginPath();
-    X.arc(sunX, sunY, 22, 0, 6.28);
-    var sf = X.createRadialGradient(sunX - 4, sunY - 4, 2, sunX, sunY, 22);
-    sf.addColorStop(0, '#FFFDE0');
-    sf.addColorStop(1, '#FFD54F');
-    X.fillStyle = sf;
-    X.fill();
-    for (var i = 0; i < 5; i++) {
-        var ax = ((i * 320 - cam.x * 0.12) % (W + 350)) - 175;
-        var ay = 35 + i * 22 + Math.sin(frame * 0.007 + i) * 8;
-        X.globalAlpha = 0.45;
-        X.fillStyle = pick(['#FFB6D9', '#D9B6FF', '#B6D9FF']);
-        X.beginPath();
-        X.arc(ax, ay, 16, 0, 6.28);
-        X.arc(ax + 14, ay - 4, 12, 0, 6.28);
-        X.arc(ax - 10, ay + 2, 10, 0, 6.28);
-        X.fill();
-        X.globalAlpha = 1;
-    }
-    X.fillStyle = '#A8E6CF';
-    for (var i = -1; i < 4; i++) {
-        var hx = i * 280 - cam.x * 0.08;
-        X.beginPath();
-        X.ellipse(hx, H - 55, 230, 70, 0, Math.PI, 0);
-        X.fill();
-    }
-    X.fillStyle = '#C1F0C1';
-    for (var i = -1; i < 5; i++) {
-        var hx = i * 230 - cam.x * 0.16 + 90;
-        X.beginPath();
-        X.ellipse(hx, H - 35, 180, 55, 0, Math.PI, 0);
-        X.fill();
-    }
-}
-
-// === INIT GAME ===
-function initGame() {
-    player = createPlayer();
-    window.player = player;
-    platforms = [];
-    ghosts = [];
-    particles = [];
-    projectiles = [];
-    kameBlasts = [];
-    score = 0;
-    distance = 0;
-    frame = 0;
-    quakeCD = 480;
-    ghostTimer = 0;
-    genX = 0;
-    shake = { x: 0, y: 0, i: 0, t: 0 };
-    spriteAnimTimer = 0;
-    currentSpriteFrame = 0;
-
-    platforms.push(makePlat(-100, H - 35, 600, 'ground'));
-    genX = 500;
-    for (var i = 0; i < 3; i++) generateChunk(genX);
-    cam.x = 0;
-    cam.y = 0;
-
-    touchState.moveX = 0;
-    touchState.moveY = 0;
-    touchState.jump = false;
-    touchState.atk = false;
-    touchState.kame = false;
-    touchState.cloud = false;
-    touchState.down = false;
-
-    var jthumb = document.getElementById('joystickThumb');
-    if (jthumb) { jthumb.style.left = '50%';
-        jthumb.style.top = '50%'; }
-    SPRITE_SCALE = calcSpriteScale();
-
-    // Update global
-    window.score = score;
-    window.distance = distance;
-    window.frame = frame;
-    window.player = player;
-    window.platforms = platforms;
-    window.ghosts = ghosts;
-    window.particles = particles;
-    window.projectiles = projectiles;
-    window.kameBlasts = kameBlasts;
-}
-
-// === GAME LOOP ===
-function loop() {
-    requestAnimationFrame(loop);
-    if (state !== 'play') return;
-    frame++;
-    window.frame = frame;
-
-    updatePlayer();
-
-    var targetCX = player.x - W * 0.35;
-    cam.x += (targetCX - cam.x) * 0.08;
-    distance = Math.max(distance, Math.floor(player.x / 10));
-    score = Math.max(score, distance);
-
-    if (player.x > genX - W * 2) generateChunk(genX);
-    platforms = platforms.filter(function(p) { return p.x + p.w > cam.x - 300; });
-
-    ghostTimer++;
-    var spawnRate = Math.max(100, 380 - distance * 0.25);
-    if (ghostTimer > spawnRate) { ghostTimer = 0;
-        spawnGhost(); }
-
-    for (var i = 0; i < ghosts.length; i++) updateGhost(ghosts[i]);
-    ghosts = ghosts.filter(function(g) {
-        if (g.hp <= 0) {
-            score += 200;
-            spawnP(g.x, g.y, 18, '#B040FF', 1.4, 1.1);
-            sfxHit();
-            triggerShake(5, 10);
-            return false;
-        }
-        return Math.abs(g.x - cam.x) < W + 200;
-    });
-
-    for (var i = 0; i < projectiles.length; i++) {
-        var p = projectiles[i];
-        p.x += p.vx;
-        p.life--;
-        for (var j = 0; j < ghosts.length; j++) {
-            var g = ghosts[j];
-            if (Math.hypot(p.x - g.x, p.y - g.y) < p.size + g.size) {
-                g.hp -= 1;
-                g.hitFlash = 6;
-                p.life = 0;
-                spawnP(g.x, g.y, 3, '#FFD700', 0.7);
-                sfxHit();
-                break;
-            }
-        }
-    }
-    projectiles = projectiles.filter(function(p) { return p.life > 0; });
-
-    for (var i = 0; i < kameBlasts.length; i++) updateKame(kameBlasts[i]);
-    kameBlasts = kameBlasts.filter(function(k) { return k.life > 0; });
-
-    for (var i = 0; i < particles.length; i++) {
-        var p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.04;
-        p.vx *= 0.97;
-        p.life--;
-    }
-    particles = particles.filter(function(p) { return p.life > 0; });
-
-    quakeCD--;
-    if (quakeCD <= 0) {
-        triggerQuake();
-        quakeCD = rndI(380, 750);
-    }
-
-    if (shake.t > 0) {
-        shake.t--;
-        var d = shake.t / 100;
-        shake.x = (Math.random() - 0.5) * shake.i * d * 2;
-        shake.y = (Math.random() - 0.5) * shake.i * d * 2;
-    } else {
-        shake.x = 0;
-        shake.y = 0;
-    }
-
-    if (player.hp <= 0) {
-        state = 'over';
-        window.state = state;
-        sfxDie();
-        document.getElementById('goSt').innerHTML = 'Skor: <span>' + score + '</span><br>Jarak: <span>' + distance + 'm</span>';
-        document.getElementById('gameover').classList.add('show');
-        document.getElementById('touchControls').classList.remove('show');
-    }
-
-    // === RENDER ===
-    X.save();
-    X.translate(shake.x, shake.y);
-    drawSky();
-
-    for (var i = 0; i < platforms.length; i++) {
-        var pl = platforms[i];
-        drawPlatform(pl);
-        for (var j = 0; j < pl.coins.length; j++) drawCoin(pl.coins[j]);
-    }
-
-    for (var i = 0; i < kameBlasts.length; i++) drawKame(kameBlasts[i]);
-    for (var i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
-    for (var i = 0; i < ghosts.length; i++) drawGhost(ghosts[i]);
-    drawPlayer();
-
-    for (var i = 0; i < particles.length; i++) {
-        var p = particles[i],
-            a = p.life / p.ml;
-        X.globalAlpha = a;
-        X.fillStyle = p.color;
-        X.beginPath();
-        X.arc(p.x - cam.x, p.y - cam.y, Math.max(0.5, p.size * a), 0, 6.28);
-        X.fill();
-        X.globalAlpha = 1;
-    }
-
-    var vg = X.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(15,0,25,0.3)');
-    X.fillStyle = vg;
-    X.fillRect(-30, -30, W + 60, H + 60);
-
-    if (player.hp < 30) {
-        var dp = Math.sin(frame * 0.12) * 0.1 + 0.1;
-        X.fillStyle = 'rgba(255,0,0,' + dp + ')';
-        X.fillRect(-30, -30, W + 60, H + 60);
-    }
-
-    X.restore();
-
-    // Update UI
-    document.getElementById('hpB').style.width = Math.max(0, player.hp / player.maxHp * 100) + '%';
-    document.getElementById('enB').style.width = Math.max(0, player.energy / player.maxEnergy * 100) + '%';
-    document.getElementById('scV').textContent = score;
-    document.getElementById('dsV').textContent = distance + 'm';
-
-    // Update global
-    window.score = score;
-    window.distance = distance;
-    window.player = player;
-    window.platforms = platforms;
-    window.ghosts = ghosts;
-    window.particles = particles;
-    window.projectiles = projectiles;
-    window.kameBlasts = kameBlasts;
-    window.cam = cam;
-}
-
-// === MULAI ===
-setupTouch();
-loadSpriteSheet().then(function() {
-    loop();
-});
+        particles.push({ x: x, y: y, vx: Math.cos(a) * sp
