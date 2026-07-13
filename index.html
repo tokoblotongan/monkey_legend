@@ -4,78 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Monkey Legend — Sun Wukong Adventure</title>
+<!-- CSS -->
+<link rel="stylesheet" href="css/style.css">
+<!-- Google Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-:root{--gold:#FFD700;--red:#FF4444;--orange:#FF8C00;--cyan:#00E5FF}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{overflow:hidden;background:#0a0010;font-family:'Nunito',sans-serif;user-select:none;touch-action:none;position:fixed;inset:0}
-canvas{display:block;position:fixed;inset:0}
-#ui{position:fixed;top:0;left:0;width:100%;pointer-events:none;z-index:10;padding:8px 12px;display:flex;justify-content:space-between;align-items:flex-start}
-.panel{background:rgba(20,5,30,0.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:6px 10px;color:#fff;min-width:90px}
-.panel h3{font-family:'Fredoka One',cursive;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:3px}
-.bar-w{height:7px;background:rgba(0,0,0,0.5);border-radius:5px;overflow:hidden}
-.bar-f{height:100%;border-radius:5px;transition:width 0.12s}
-.hp-f{background:linear-gradient(90deg,#FF4444,#FF6B6B)}
-.en-f{background:linear-gradient(90deg,var(--cyan),#00B8D4)}
-.val{font-size:17px;font-weight:900;font-family:'Fredoka One',cursive}
-.val.g{color:var(--gold)}.val.c{color:var(--cyan)}
-#touchControls{position:fixed;inset:0;z-index:15;pointer-events:none;display:none}
-#touchControls.show{display:block}
-#joystickZone{position:absolute;left:10px;bottom:20px;width:140px;height:140px;pointer-events:auto;touch-action:none;z-index:16}
-#joystickBase{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.15)}
-#joystickThumb{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:rgba(255,215,0,0.35);border:2px solid rgba(255,215,0,0.5);transition:none;pointer-events:none}
-#actionButtons{position:absolute;right:10px;bottom:20px;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:auto;z-index:16}
-.act-btn{width:58px;height:58px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.5);-webkit-user-select:none;touch-action:none;cursor:pointer;transition:transform 0.1s}
-.act-btn:active,.act-btn.pressed{transform:scale(0.85);filter:brightness(1.3)}
-#btnJump{background:rgba(76,175,80,0.35);border-color:rgba(76,175,80,0.6)}
-#btnAtk{background:rgba(255,152,0,0.35);border-color:rgba(255,152,0,0.6)}
-#btnKame{background:rgba(0,229,255,0.3);border-color:rgba(0,229,255,0.5)}
-#btnCloud{background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.4)}
-#btnDown{background:rgba(150,150,150,0.25);border-color:rgba(150,150,150,0.4);width:46px;height:32px;border-radius:10px;font-size:9px}
-.act-row{display:flex;gap:8px;align-items:center}
-#overlay{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.8s;background:linear-gradient(180deg,#0a0010 0%,#1a0a1e 40%,#2a1020 100%)}
-#overlay.hidden{opacity:0;pointer-events:none}
-#coverBg{position:absolute;inset:0;z-index:0;background-image:url('cover.jpg');background-size:contain;background-position:center center;background-repeat:no-repeat;background-color:#0a0010;opacity:1}
-#coverBg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,0,16,0) 50%,rgba(10,0,16,0.4) 80%,rgba(10,0,16,0.95) 100%)}
-#menuContent{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:100%;max-width:500px;padding:20px;padding-bottom:8vh;height:100%}
-.enter-hint{color:var(--gold);font-family:'Fredoka One',cursive;font-size:clamp(12px,1.8vw,16px);margin:0 0 16px;animation:pulse 1.5s ease-in-out infinite;text-shadow:0 2px 10px rgba(0,0,0,0.8)}
-@keyframes pulse{0%,100%{opacity:0.5;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
-.btn{pointer-events:all;font-family:'Fredoka One',cursive;font-size:clamp(16px,2.5vw,20px);padding:14px 50px;border:none;border-radius:50px;cursor:pointer;color:#1a0a1e;background:linear-gradient(135deg,#FFD700,#FF8C00);box-shadow:0 4px 30px rgba(255,140,0,0.5),inset 0 -3px 0 rgba(139,69,19,0.3);transition:all 0.3s;position:relative;overflow:hidden;min-width:200px;opacity:1}
-.btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.25),transparent);pointer-events:none}
-.btn:hover{transform:scale(1.05);box-shadow:0 6px 45px rgba(255,140,0,0.7)}
-.btn:active{transform:scale(0.95)}
-.ctrls{margin-top:18px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;padding:0 12px}
-.ctrl{background:rgba(0,0,0,0.6);border:1px solid rgba(255,215,0,0.2);border-radius:6px;padding:6px 10px;color:rgba(255,215,0,0.8);font-size:10px;backdrop-filter:blur(4px)}
-.ctrl kbd{background:rgba(255,215,0,0.15);border-radius:3px;padding:2px 6px;font-family:'Fredoka One',cursive;color:#FFD700;font-size:9px;border:1px solid rgba(255,215,0,0.3)}
-#gameover{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,0,0,0.92)}
-#gameover.show{display:flex}
-#gameover h1{font-family:'Fredoka One',cursive;font-size:46px;background:linear-gradient(135deg,#FF4444,#FF6B6B);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px}
-.st{color:rgba(255,255,255,0.55);font-size:15px;margin-bottom:6px;text-align:center;line-height:1.8}
-.st span{color:var(--gold);font-weight:900;font-size:18px}
-.qf{position:fixed;inset:0;pointer-events:none;z-index:5;background:rgba(255,50,50,0);transition:background 0.08s}
-.qf.on{background:rgba(255,50,50,0.07)}
-#loadingBar{position:fixed;bottom:12%;left:50%;transform:translateX(-50%);width:180px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;z-index:30;overflow:hidden;display:none}
-#loadingBar.show{display:block}
-#loadingFill{height:100%;width:0%;background:linear-gradient(90deg,#FFD700,#FF8C00);border-radius:3px;transition:width 0.3s}
-#loadingText{position:fixed;bottom:calc(12% + 14px);left:50%;transform:translateX(-50%);color:rgba(255,215,0,0.7);font-family:'Fredoka One',cursive;font-size:12px;z-index:30;display:none;white-space:nowrap}
-#loadingText.show{display:block}
-@media(max-width:600px){
-  .panel{min-width:65px;padding:4px 7px}.panel h3{font-size:7px}.val{font-size:13px}.bar-w{height:5px}
-  #joystickZone{width:110px;height:110px;left:6px;bottom:12px}#joystickBase{width:85px;height:85px}#joystickThumb{width:34px;height:34px}
-  .act-btn{width:46px;height:46px;font-size:8px}#btnDown{width:36px;height:26px;font-size:7px}
-  #actionButtons{right:6px;bottom:12px;gap:5px}.act-row{gap:5px}
-  .btn{min-width:150px;padding:12px 30px;font-size:clamp(14px,2.2vw,17px)}
-  #coverBg{background-size:contain;background-position:center center}
-}
-@media(min-width:601px) and (max-width:1024px){#coverBg{background-size:contain;background-position:center center}}
-@media(min-width:1025px){#coverBg{background-size:contain;background-position:center center}}
-</style>
 </head>
 <body>
 
 <canvas id="c"></canvas>
 <div class="qf" id="qf"></div>
 
+<!-- UI Game -->
 <div id="ui">
   <div class="panel"><h3>Nyawa</h3><div class="bar-w"><div class="bar-f hp-f" id="hpB" style="width:100%"></div></div></div>
   <div class="panel" style="text-align:center"><h3>Skor</h3><div class="val g" id="scV">0</div></div>
@@ -83,6 +22,7 @@ canvas{display:block;position:fixed;inset:0}
   <div class="panel"><h3>Energi</h3><div class="bar-w"><div class="bar-f en-f" id="enB" style="width:100%"></div></div></div>
 </div>
 
+<!-- Touch Controls -->
 <div id="touchControls">
   <div id="joystickZone"><div id="joystickBase"></div><div id="joystickThumb"></div></div>
   <div id="actionButtons">
@@ -92,6 +32,7 @@ canvas{display:block;position:fixed;inset:0}
   </div>
 </div>
 
+<!-- Overlay Menu -->
 <div id="overlay">
   <div id="coverBg"></div>
   <div id="menuContent">
@@ -108,6 +49,7 @@ canvas{display:block;position:fixed;inset:0}
   </div>
 </div>
 
+<!-- Game Over -->
 <div id="gameover">
   <h1>Tumbang!</h1>
   <div class="st" id="goSt"></div>
@@ -115,10 +57,13 @@ canvas{display:block;position:fixed;inset:0}
   <button class="btn" id="restartBtn">Coba Lagi</button>
 </div>
 
+<!-- Loading -->
 <div id="loadingBar"><div id="loadingFill"></div></div>
 <div id="loadingText">Memuat karakter...</div>
 
-<!-- ========== JAVASCRIPT GAME ========== -->
-<script src="game.js"></script>
+<!-- ========== JAVASCRIPT ========== -->
+<script src="js/utils.js"></script>
+<script src="js/player.js"></script>
+<script src="js/game.js"></script>
 </body>
 </html>
