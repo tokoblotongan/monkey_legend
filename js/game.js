@@ -28,7 +28,7 @@ window.isTouchDevice = isTouchDevice;
 var spriteData = null;
 var spriteReady = false;
 var SPRITE_SCALE = 1.0;
-var SPRITE_URL = 'https://z-cdn-media.chatglm.cn/files/9e4e83ad-fbb8-4252-9e6e-b7e0255ae9ca.png?auth_key=1883842197-b83203e684e34553953d8c86a16b1651-0-4145189266a8f1afaa2ab5c4f38e4cb9';
+var SPRITE_URL = 'https://raw.githubusercontent.com/tokoblotongan/monkey_legend/main/assets/images/Lari%20hadap%20depan.png';
 
 function calcSpriteScale() {
     if (!spriteData) return 1.0;
