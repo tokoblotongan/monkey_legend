@@ -19,7 +19,6 @@ function loadCloudImage() {
         img.crossOrigin = 'anonymous';
         
         img.onload = function() {
-            // === PROSES HAPUS BACKGROUND HITAM ===
             var canvas = document.createElement('canvas');
             var ctx = canvas.getContext('2d');
             canvas.width = img.width;
@@ -29,22 +28,19 @@ function loadCloudImage() {
             var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             var data = imageData.data;
             
-            // Hapus pixel dengan warna hitam (atau mendekati hitam)
             for (var i = 0; i < data.length; i += 4) {
                 var r = data[i];
                 var g = data[i + 1];
                 var b = data[i + 2];
                 var a = data[i + 3];
                 
-                // Jika warna mendekati hitam (0-40) dan opasitas penuh
                 if (r < 40 && g < 40 && b < 40 && a > 200) {
-                    data[i + 3] = 0; // Set alpha menjadi 0 (transparan)
+                    data[i + 3] = 0;
                 }
             }
             
             ctx.putImageData(imageData, 0, 0);
             
-            // Simpan hasil yang sudah transparan ke cloudImage
             cloudImage = canvas;
             cloudLoaded = true;
             CLOUD_SCALE = Math.max(0.3, Math.min(1.5, 80 / canvas.width));
@@ -66,17 +62,14 @@ function loadCloudImage() {
 // GAMBAR AWAN DI BAWAH KARAKTER (DENGAN FLIP)
 // ============================================
 function drawCloud(p, sx, sy, frame) {
-    // Hanya gambar jika karakter di atas awan
     if (!p || !p.onCloud) return;
     
     var X = window.X;
     if (!X) return;
 
-    // ===== CEK APAKAH SUDAH DIGAMBAR DI FRAME INI =====
     if (_cloudDrawnThisFrame) return;
     _cloudDrawnThisFrame = true;
 
-    // Jika gambar awan gagal dimuat, pakai fallback
     if (!cloudLoaded || !cloudImage) {
         drawCloudFallback(sx, sy);
         return;
@@ -84,35 +77,29 @@ function drawCloud(p, sx, sy, frame) {
 
     X.save();
     
-    // Posisi awan di bawah kaki (tengah)
     var cloudW = cloudImage.width * CLOUD_SCALE;
     var cloudH = cloudImage.height * CLOUD_SCALE;
     var cloudX = -cloudW / 2;
     var cloudY = window.PH / 2 - 2;
     
-    // Efek melayang (float)
     var floatOffset = Math.sin(frame * 0.03 + p.x * 0.01) * 3;
     var rot = p.vx * 0.01;
     
     X.translate(0, floatOffset);
     X.rotate(rot);
     
-    // ===== FLIP AWAN SESUAI ARAH KARAKTER =====
     if (p.facing === -1) {
         X.scale(-1, 1);
-        // Karena di-scale -1, posisi x harus digeser
         cloudX = -cloudX - cloudW;
     }
     
-    // ===== GAMBAR AWAN (SUDAH TRANSPARAN) =====
     X.globalAlpha = 0.9;
     X.drawImage(cloudImage, cloudX, cloudY, cloudW, cloudH);
     X.globalAlpha = 1;
     
-    // Efek glow
     var cg = X.createRadialGradient(0, cloudY + cloudH/2, cloudW*0.2, 0, cloudY + cloudH/2, cloudW*1.2);
-    cg.addColorStop(0, 'rgba(255,255,255,0.1)');
-    cg.addColorStop(1, 'rgba(255,255,255,0)');
+    cg.addColorStop(0, 'rgba(255,140,0,0.08)');
+    cg.addColorStop(1, 'rgba(255,140,0,0)');
     X.beginPath();
     X.arc(0, cloudY + cloudH/2, cloudW*1.2, 0, 6.28);
     X.fillStyle = cg;
@@ -143,34 +130,57 @@ function drawCloudFallback(sx, sy) {
     X.arc(0, cy - 4, 13, 0, 6.28);
     X.fillStyle = 'rgba(255,250,242,0.85)';
     X.fill();
-    
-    var cg = X.createRadialGradient(0, cy, 4, 0, cy, 22);
-    cg.addColorStop(0, 'rgba(255,250,240,0.5)');
-    cg.addColorStop(1, 'rgba(255,240,220,0)');
-    X.beginPath();
-    X.arc(0, cy, 22, 0, 6.28);
-    X.fillStyle = cg;
-    X.fill();
     X.restore();
 }
 
 // ============================================
-// PARTIKEL AWAN SAAT AKTIF
+// PARTIKEL AWAN SAAT AKTIF - EFEK API
 // ============================================
 function spawnCloudParticles(p) {
     if (!cloudLoaded || !p) return;
     
-    for (var i = 0; i < 5; i++) {
+    // === PARTIKEL API (ORANYE) ===
+    var count = 15 + Math.floor(rnd(0, 10));
+    for (var i = 0; i < count; i++) {
         if (window.particles) {
+            var colors = [
+                'rgba(255, 140, 0, 0.8)',
+                'rgba(255, 100, 0, 0.7)',
+                'rgba(255, 200, 50, 0.6)',
+                'rgba(255, 80, 0, 0.5)',
+                'rgba(255, 160, 20, 0.9)'
+            ];
             window.particles.push({
-                x: p.x + rnd(-20, 20),
-                y: p.y + window.PH/2 + rnd(0, 10),
-                vx: rnd(-0.5, 0.5),
-                vy: rnd(0.3, 1.5),
-                life: rnd(15, 30),
-                ml: 30,
-                size: rnd(4, 10),
-                color: 'rgba(255,255,255,0.3)'
+                x: p.x + rnd(-35, 35),
+                y: p.y + window.PH/2 + rnd(-15, 20),
+                vx: rnd(-3, 3) * rnd(0.5, 1.5),
+                vy: rnd(-5, -1) * rnd(0.5, 1.5),
+                life: rnd(25, 55),
+                ml: 55,
+                size: rnd(6, 20),
+                color: pick(colors)
+            });
+        }
+    }
+    
+    // === PARTIKEL ASAP (efek tambahan) ===
+    var smokeCount = 5 + Math.floor(rnd(0, 8));
+    for (var i = 0; i < smokeCount; i++) {
+        if (window.particles) {
+            var smokeColors = [
+                'rgba(200, 180, 150, 0.25)',
+                'rgba(180, 160, 130, 0.2)',
+                'rgba(220, 200, 170, 0.15)'
+            ];
+            window.particles.push({
+                x: p.x + rnd(-40, 40),
+                y: p.y + window.PH/2 + rnd(-20, 10),
+                vx: rnd(-1.5, 1.5) * rnd(0.3, 0.8),
+                vy: rnd(-3, -0.5) * rnd(0.3, 0.8),
+                life: rnd(30, 60),
+                ml: 60,
+                size: rnd(10, 30),
+                color: pick(smokeColors)
             });
         }
     }
