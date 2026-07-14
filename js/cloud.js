@@ -17,43 +17,43 @@ function loadCloudImage() {
     return new Promise(function(resolve) {
         var img = new Image();
         img.crossOrigin = 'anonymous';
-        
+
         img.onload = function() {
             var canvas = document.createElement('canvas');
             var ctx = canvas.getContext('2d');
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
-            
+
             var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             var data = imageData.data;
-            
+
             for (var i = 0; i < data.length; i += 4) {
                 var r = data[i];
                 var g = data[i + 1];
                 var b = data[i + 2];
                 var a = data[i + 3];
-                
+
                 if (r < 40 && g < 40 && b < 40 && a > 200) {
                     data[i + 3] = 0;
                 }
             }
-            
+
             ctx.putImageData(imageData, 0, 0);
-            
+
             cloudImage = canvas;
             cloudLoaded = true;
             CLOUD_SCALE = Math.max(0.3, Math.min(1.5, 80 / canvas.width));
             console.log('✅ Awan berhasil dimuat & background dihapus!');
             resolve();
         };
-        
+
         img.onerror = function() {
             console.warn('⚠️ Gagal memuat awan, pakai fallback');
             cloudLoaded = false;
             resolve();
         };
-        
+
         img.src = CLOUD_URL;
     });
 }
@@ -62,6 +62,8 @@ function loadCloudImage() {
 // GAMBAR AWAN DI BAWAH KARAKTER (DENGAN FLIP)
 // ============================================
 function drawCloud(p, sx, sy, frame) {
+    // ✅ FIX: Jangan gambar apapun kalau game sudah over atau bukan play
+    if (window.state !== 'play') return;
     if (!p || !p.onCloud) return;
     
     var X = window.X;
@@ -121,7 +123,7 @@ function resetCloudFrame() {
 function drawCloudFallback(sx, sy) {
     var X = window.X;
     if (!X) return;
-    
+
     X.save();
     var cy = window.PH / 2 - 2;
     X.beginPath();
@@ -138,7 +140,7 @@ function drawCloudFallback(sx, sy) {
 // ============================================
 function spawnCloudParticles(p) {
     if (!cloudLoaded || !p) return;
-    
+
     // === PARTIKEL API (ORANYE) ===
     var count = 15 + Math.floor(rnd(0, 10));
     for (var i = 0; i < count; i++) {
@@ -162,7 +164,7 @@ function spawnCloudParticles(p) {
             });
         }
     }
-    
+
     // === PARTIKEL ASAP (efek tambahan) ===
     var smokeCount = 5 + Math.floor(rnd(0, 8));
     for (var i = 0; i < smokeCount; i++) {
