@@ -11,7 +11,7 @@ var CLOUD_URL = 'assets/images/awan1.png';
 var _cloudDrawnThisFrame = false;
 
 // ============================================
-// MUAT GAMBAR AWAN
+// MUAT GAMBAR AWAN & HAPUS BACKGROUND HITAM
 // ============================================
 function loadCloudImage() {
     return new Promise(function(resolve) {
@@ -19,10 +19,36 @@ function loadCloudImage() {
         img.crossOrigin = 'anonymous';
         
         img.onload = function() {
-            cloudImage = img;
+            // === PROSES HAPUS BACKGROUND HITAM ===
+            var canvas = document.createElement('canvas');
+            var ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var data = imageData.data;
+            
+            // Hapus pixel dengan warna hitam (atau mendekati hitam)
+            for (var i = 0; i < data.length; i += 4) {
+                var r = data[i];
+                var g = data[i + 1];
+                var b = data[i + 2];
+                var a = data[i + 3];
+                
+                // Jika warna mendekati hitam (0-40) dan opasitas penuh
+                if (r < 40 && g < 40 && b < 40 && a > 200) {
+                    data[i + 3] = 0; // Set alpha menjadi 0 (transparan)
+                }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Simpan hasil yang sudah transparan ke cloudImage
+            cloudImage = canvas;
             cloudLoaded = true;
-            CLOUD_SCALE = Math.max(0.3, Math.min(1.5, 80 / img.width));
-            console.log('✅ Awan berhasil dimuat!');
+            CLOUD_SCALE = Math.max(0.3, Math.min(1.5, 80 / canvas.width));
+            console.log('✅ Awan berhasil dimuat & background dihapus!');
             resolve();
         };
         
@@ -74,13 +100,11 @@ function drawCloud(p, sx, sy, frame) {
     // ===== FLIP AWAN SESUAI ARAH KARAKTER =====
     if (p.facing === -1) {
         X.scale(-1, 1);
+        // Karena di-scale -1, posisi x harus digeser
         cloudX = -cloudX - cloudW;
     }
     
-    // === CLEAR AREA AWAN SEBELUM MENGGAMBAR ===
-    X.clearRect(cloudX - 20, cloudY - 20, cloudW + 40, cloudH + 40);
-    
-    // Gambar awan
+    // ===== GAMBAR AWAN (SUDAH TRANSPARAN) =====
     X.globalAlpha = 0.9;
     X.drawImage(cloudImage, cloudX, cloudY, cloudW, cloudH);
     X.globalAlpha = 1;
