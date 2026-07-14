@@ -859,7 +859,7 @@ function getInput() {
     var atk = keys['a'] || touchState.atk;
     var cloud = keys['s'] || touchState.cloud;
     var kame = keys['d'] || keys['k'] || touchState.kame;
-    
+
     return { left: left, right: right, up: up, down: down, atk: atk, cloud: cloud, kame: kame };
 }
 
@@ -872,7 +872,7 @@ function createPlayer() {
 
 function updatePlayer() {
     var p = player, inp = getInput();
-    
+
     // GERAKAN: hanya dari ArrowLeft/ArrowRight
     if (inp.left) { p.vx = -SPEED; p.facing = -1; }
     else if (inp.right) { p.vx = SPEED; p.facing = 1; }
@@ -1381,13 +1381,20 @@ function loop() {
         shake.y = 0;
     }
 
-    if (player.hp <= 0) {
+    // ============================================
+    // GAME OVER - FIX
+    // ============================================
+    if (player.hp <= 0 && state !== 'over') {
         state = 'over';
         window.state = state;
-        sfxDie();
-        document.getElementById('goSt').innerHTML = 'Skor: <span>' + score + '</span><br>Jarak: <span>' + distance + 'm</span>';
-        document.getElementById('gameover').classList.add('show');
-        document.getElementById('touchControls').classList.remove('show');
+        try { sfxDie(); } catch(e) {}
+        var goSt = document.getElementById('goSt');
+        if (goSt) goSt.innerHTML = 'Skor: <span>' + score + '</span><br>Jarak: <span>' + distance + 'm</span>';
+        var gameover = document.getElementById('gameover');
+        if (gameover) gameover.classList.add('show');
+        var touchControls = document.getElementById('touchControls');
+        if (touchControls) touchControls.classList.remove('show');
+        console.log('💀 Game Over - Skor:', score, 'Jarak:', distance);
     }
 
     // === RENDER ===
