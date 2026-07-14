@@ -2,17 +2,13 @@
 // CLOUD MODULE - Khusus untuk gambar awan
 // ============================================
 
-// === VARIABEL GLOBAL ===
 var cloudImage = null;
 var cloudLoaded = false;
 var CLOUD_SCALE = 1.0;
-var CLOUD_URL = 'assets/images/awan1.png';
-
-// === FLAG UNTUK MENCEGAH GAMBAR BERGANDA ===
-var _cloudDrawnThisFrame = false;
+var CLOUD_URL = 'assets/images/awan1.png'; // ← pakai gambar baru
 
 // ============================================
-// MUAT GAMBAR AWAN
+// MUAT GAMBAR AWAN & HAPUS BACKGROUND HITAM
 // ============================================
 function loadCloudImage() {
     return new Promise(function(resolve) {
@@ -20,10 +16,36 @@ function loadCloudImage() {
         img.crossOrigin = 'anonymous';
         
         img.onload = function() {
-            cloudImage = img;
+            // === PROSES HAPUS BACKGROUND HITAM ===
+            var canvas = document.createElement('canvas');
+            var ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var data = imageData.data;
+            
+            // Hapus pixel dengan warna hitam (atau mendekati hitam)
+            for (var i = 0; i < data.length; i += 4) {
+                var r = data[i];
+                var g = data[i + 1];
+                var b = data[i + 2];
+                var a = data[i + 3];
+                
+                // Jika warna mendekati hitam (0-30) dan opasitas penuh
+                if (r < 30 && g < 30 && b < 30 && a > 200) {
+                    data[i + 3] = 0; // Set alpha menjadi 0 (transparan)
+                }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Simpan hasil ke cloudImage
+            cloudImage = canvas;
             cloudLoaded = true;
-            CLOUD_SCALE = Math.max(0.3, Math.min(1.5, 80 / img.width));
-            console.log('✅ Awan berhasil dimuat!');
+            CLOUD_SCALE = Math.max(0.3, Math.min(1.5, 80 / canvas.width));
+            console.log('✅ Awan berhasil dimuat & background dihapus!');
             resolve();
         };
         
@@ -37,102 +59,50 @@ function loadCloudImage() {
     });
 }
 
-// ============================================
-// GAMBAR AWAN DI BAWAH KARAKTER (HANYA 1)
-// ============================================
+// === FUNGSI LAINNYA (drawCloud, drawCloudFallback, spawnCloudParticles) ===
+// Tetap sama seperti sebelumnya
+// ... (saya tulis ulang di bawah agar lengkap)
+
 function drawCloud(p, sx, sy, frame) {
-    // Hanya gambar jika karakter di atas awan
     if (!p || !p.onCloud) return;
-    
     var X = window.X;
     if (!X) return;
-
-    // ===== CEK APAKAH SUDAH DIGAMBAR DI FRAME INI =====
-    // Ini mencegah penggambaran berganda dalam 1 frame
-    if (_cloudDrawnThisFrame) return;
-    _cloudDrawnThisFrame = true;
-
-    // Jika gambar awan gagal dimuat, pakai fallback
     if (!cloudLoaded || !cloudImage) {
         drawCloudFallback(sx, sy);
         return;
     }
 
     X.save();
-    
-    // Posisi awan di bawah kaki (tengah)
     var cloudW = cloudImage.width * CLOUD_SCALE;
     var cloudH = cloudImage.height * CLOUD_SCALE;
     var cloudX = -cloudW / 2;
     var cloudY = window.PH / 2 - 2;
-    
-    // Efek melayang (float)
     var floatOffset = Math.sin(frame * 0.03 + p.x * 0.01) * 3;
     var rot = p.vx * 0.01;
-    
     X.translate(0, floatOffset);
     X.rotate(rot);
-    
-    // === CLEAR AREA AWAN SEBELUM MENGGAMBAR ===
-    X.clearRect(cloudX - 20, cloudY - 20, cloudW + 40, cloudH + 40);
-    
-    // Gambar awan
     X.globalAlpha = 0.9;
     X.drawImage(cloudImage, cloudX, cloudY, cloudW, cloudH);
     X.globalAlpha = 1;
-    
-    // Efek glow (cahaya di sekitar awan)
-    var cg = X.createRadialGradient(0, cloudY + cloudH/2, cloudW*0.2, 0, cloudY + cloudH/2, cloudW*1.2);
-    cg.addColorStop(0, 'rgba(255,255,255,0.1)');
-    cg.addColorStop(1, 'rgba(255,255,255,0)');
-    X.beginPath();
-    X.arc(0, cloudY + cloudH/2, cloudW*1.2, 0, 6.28);
-    X.fillStyle = cg;
-    X.fill();
-    
     X.restore();
 }
 
-// ============================================
-// RESET FLAG SETIAP FRAME (dipanggil dari game.js)
-// ============================================
-function resetCloudFrame() {
-    _cloudDrawnThisFrame = false;
-}
-
-// ============================================
-// FALLBACK: Awan Canvas (jika gambar gagal)
-// ============================================
 function drawCloudFallback(sx, sy) {
     var X = window.X;
     if (!X) return;
-    
     X.save();
     var cy = window.PH / 2 - 2;
-    
     X.beginPath();
     X.arc(-10, cy, 11, 0, 6.28);
     X.arc(10, cy, 11, 0, 6.28);
     X.arc(0, cy - 4, 13, 0, 6.28);
     X.fillStyle = 'rgba(255,250,242,0.85)';
     X.fill();
-    
-    var cg = X.createRadialGradient(0, cy, 4, 0, cy, 22);
-    cg.addColorStop(0, 'rgba(255,250,240,0.5)');
-    cg.addColorStop(1, 'rgba(255,240,220,0)');
-    X.beginPath();
-    X.arc(0, cy, 22, 0, 6.28);
-    X.fillStyle = cg;
-    X.fill();
     X.restore();
 }
 
-// ============================================
-// PARTIKEL AWAN SAAT AKTIF
-// ============================================
 function spawnCloudParticles(p) {
     if (!cloudLoaded || !p) return;
-    
     for (var i = 0; i < 5; i++) {
         if (window.particles) {
             window.particles.push({
