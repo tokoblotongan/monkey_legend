@@ -943,7 +943,7 @@ function drawPlayer() {
         try { 
             drawCloud(p, sx, sy, frame); 
         } catch(cloudErr) { 
-            console.warn('drawCloud error (dilewati):', cloudErr); 
+            // Gagal digambar? Diamkan saja, jangan crash game
         }
     }
 
@@ -1058,7 +1058,7 @@ function drawPlayer() {
             X.fill();
         }
     } catch(spriteErr) {
-        console.warn('Sprite render error (dilewati):', spriteErr);
+        // Sprite error diabaikan
     }
 
     if (p.onCloud) {
@@ -1397,7 +1397,7 @@ function loop() {
     // ============================================
     if (player.hp <= 0 && state !== 'over') {
         state = 'over';
-        window.state = state;
+        window.state = state; // ✅ WAJIB update window.state SEKARANG juga
         try { sfxDie(); } catch(e) {}
         var goSt = document.getElementById('goSt');
         if (goSt) goSt.innerHTML = 'Skor: <span>' + score + '</span><br>Jarak: <span>' + distance + 'm</span>';
@@ -1407,11 +1407,11 @@ function loop() {
         if (touchControls) touchControls.classList.remove('show');
         console.log('💀 Game Over - Skor:', score, 'Jarak:', distance);
         
-        // ✅ FIX: STOP langsung, jangan render lagi di frame ini
+        // ✅ FIX KRUSIAL: Hentikan semua proses di frame ini
         return;
     }
 
-    // ✅ FIX: Jangan render kalau state bukan 'play'
+    // ✅ FIX KRUSIAL: Double check, jangan lanjut ke render kalau sudah over
     if (state !== 'play') return;
 
     // === RENDER ===
