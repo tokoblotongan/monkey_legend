@@ -370,10 +370,10 @@ function updateJoystick(clientX, clientY, maxR, jthumb) {
 document.addEventListener('touchmove', function(e) { if (state === 'play') e.preventDefault(); }, { passive: false });
 
 // ============================================
-// FIX: FUNGSI TRIGGER GAME OVER DENGAN CANCEL LOOP
+// TRIGGER GAME OVER
 // ============================================
 function triggerGameOver() {
-    // Hentikan loop sepenuhnya
+    // Hentikan loop jika ada
     if (animationId) {
         cancelAnimationFrame(animationId);
         animationId = null;
@@ -405,9 +405,11 @@ function triggerGameOver() {
 }
 
 // ============================================
-// MULAI / RESTART GAME - DENGAN CANCEL LOOP
+// MULAI / RESTART GAME
 // ============================================
 function startGame() {
+    console.log('🎮 Start Game dipicu...');
+    
     // Hentikan loop yang sedang berjalan
     if (animationId) {
         cancelAnimationFrame(animationId);
@@ -415,8 +417,18 @@ function startGame() {
         window.animationId = null;
     }
 
-    if (typeof initAudio === 'function') { try { initAudio(); } catch(e) {} }
-    initGame();
+    if (typeof initAudio === 'function') { 
+        try { initAudio(); } catch(e) { console.warn('Audio init error:', e); } 
+    }
+
+    try {
+        initGame();
+    } catch (err) {
+        console.error('❌ FATAL ERROR di initGame():', err);
+        alert('Gagal memulai game: ' + err.message + '\nCek Console (F12) untuk detail.');
+        return;
+    }
+
     state = 'play';
     window.state = state;
     document.getElementById('overlay').classList.add('hidden');
@@ -427,6 +439,8 @@ function startGame() {
 }
 
 function restartGame() {
+    console.log('🔄 Restart Game dipicu...');
+    
     // Hentikan loop yang sedang berjalan
     if (animationId) {
         cancelAnimationFrame(animationId);
@@ -434,21 +448,53 @@ function restartGame() {
         window.animationId = null;
     }
 
-    if (typeof initAudio === 'function') { try { initAudio(); } catch(e) {} }
-    initGame();
+    if (typeof initAudio === 'function') { 
+        try { initAudio(); } catch(e) { console.warn('Audio init error:', e); } 
+    }
+
+    try {
+        initGame();
+    } catch (err) {
+        console.error('❌ FATAL ERROR di initGame():', err);
+        alert('Gagal restart: ' + err.message + '\nCek Console (F12) untuk detail.');
+        return;
+    }
+
     state = 'play';
     window.state = state;
-    document.getElementById('gameover').classList.remove('show');
-    if (isTouchDevice) document.getElementById('touchControls').classList.add('show');
+    
+    var gameoverEl = document.getElementById('gameover');
+    if (gameoverEl) gameoverEl.classList.remove('show');
+    
+    if (isTouchDevice) {
+        var touchControls = document.getElementById('touchControls');
+        if (touchControls) touchControls.classList.add('show');
+    }
+    
+    console.log('✅ Restart Berhasil, State:', state);
     
     // Mulai loop baru
     loop();
 }
 
-document.getElementById('startBtn').addEventListener('click', function(e) { if (typeof initAudio === 'function') initAudio(); startGame(); });
-document.getElementById('startBtn').addEventListener('touchend', function(e) { e.preventDefault(); if (typeof initAudio === 'function') initAudio(); startGame(); });
-document.getElementById('restartBtn').addEventListener('click', function(e) { if (typeof initAudio === 'function') initAudio(); restartGame(); });
-document.getElementById('restartBtn').addEventListener('touchend', function(e) { e.preventDefault(); if (typeof initAudio === 'function') initAudio(); restartGame(); });
+document.getElementById('startBtn').addEventListener('click', function(e) { 
+    if (typeof initAudio === 'function') initAudio(); 
+    startGame(); 
+});
+document.getElementById('startBtn').addEventListener('touchend', function(e) { 
+    e.preventDefault(); 
+    if (typeof initAudio === 'function') initAudio(); 
+    startGame(); 
+});
+document.getElementById('restartBtn').addEventListener('click', function(e) { 
+    if (typeof initAudio === 'function') initAudio(); 
+    restartGame(); 
+});
+document.getElementById('restartBtn').addEventListener('touchend', function(e) { 
+    e.preventDefault(); 
+    if (typeof initAudio === 'function') initAudio(); 
+    restartGame(); 
+});
 
 // === PLATFORM ===
 function makePlat(x, y, w, type) {
@@ -923,44 +969,90 @@ function drawStar(c, cx, cy, sp, or, ir, col) {
     c.closePath(); c.fillStyle = col; c.fill();
 }
 
-// === INIT GAME ===
+// ============================================
+// INIT GAME - ROBUST DENGAN GUARD CLAUSES
+// ============================================
 function initGame() {
+    console.log('🔧 initGame() dipanggil...');
+    
+    // --- GUARD CLAUSES ---
+    if (typeof W === 'undefined' || typeof H === 'undefined' || W === 0 || H === 0) {
+        throw new Error('Canvas Width/Height (W/H) belum siap! Nilai: W=' + W + ', H=' + H);
+    }
+    if (!window.X) {
+        throw new Error('Canvas Context (window.X) belum siap!');
+    }
+    // -----------------------------------------
+
     player = createPlayer();
     window.player = player;
-    platforms = []; ghosts = []; particles = []; projectiles = []; kameBlasts = [];
-    score = 0; distance = 0; frame = 0;
-    quakeCD = 480; ghostTimer = 0; genX = 0;
+    platforms = [];
+    ghosts = [];
+    particles = [];
+    projectiles = [];
+    kameBlasts = [];
+    score = 0;
+    distance = 0;
+    frame = 0;
+    quakeCD = 480;
+    ghostTimer = 0;
+    genX = 0;
     shake = { x: 0, y: 0, i: 0, t: 0 };
-    spriteAnimTimer = 0; currentSpriteFrame = 0;
+    spriteAnimTimer = 0;
+    currentSpriteFrame = 0;
 
     platforms.push(makePlat(-100, H - 35, 600, 'ground'));
     genX = 500;
     for (var i = 0; i < 3; i++) generateChunk(genX);
-    cam.x = 0; cam.y = 0;
+    cam.x = 0;
+    cam.y = 0;
 
-    touchState.moveX = 0; touchState.moveY = 0;
-    touchState.jump = false; touchState.atk = false;
-    touchState.kame = false; touchState.cloud = false; touchState.down = false;
+    touchState.moveX = 0;
+    touchState.moveY = 0;
+    touchState.jump = false;
+    touchState.atk = false;
+    touchState.kame = false;
+    touchState.cloud = false;
+    touchState.down = false;
 
     var jthumb = document.getElementById('joystickThumb');
     if (jthumb) { jthumb.style.left = '50%'; jthumb.style.top = '50%'; }
     SPRITE_SCALE = calcSpriteScale();
 
-    window.score = score; window.distance = distance; window.frame = frame;
-    window.player = player; window.platforms = platforms; window.ghosts = ghosts;
-    window.particles = particles; window.projectiles = projectiles; window.kameBlasts = kameBlasts;
-    window.quakeCD = quakeCD; window.ghostTimer = ghostTimer; window.genX = genX;
+    // Update window globals
+    window.score = score;
+    window.distance = distance;
+    window.frame = frame;
+    window.player = player;
+    window.platforms = platforms;
+    window.ghosts = ghosts;
+    window.particles = particles;
+    window.projectiles = projectiles;
+    window.kameBlasts = kameBlasts;
+    window.quakeCD = quakeCD;
+    window.ghostTimer = ghostTimer;
+    window.genX = genX;
+    window.W = W;
+    window.H = H;
+    
+    console.log('✅ initGame() selesai');
 }
 
 // ============================================
-// GAME LOOP - DENGAN CANCEL ANIMATION FRAME
+// GAME LOOP - DENGAN CANVAS CLEAR DI LUAR STATE
 // ============================================
 function loop() {
-    animationId = requestAnimationFrame(loop);
-    window.animationId = animationId;
+    requestAnimationFrame(loop);
 
-    // Hanya jalankan logic jika state === 'play'
-    if (state !== 'play') return;
+    // ===== SELALU BERSIHKAN & GAMBAR BACKGROUND =====
+    X.clearRect(0, 0, W, H);
+    drawSky();
+
+    // ===== HANYA JALANKAN LOGIC JIKA STATE 'play' =====
+    if (state !== 'play') {
+        // Tampilkan status di canvas jika diperlukan
+        return;
+    }
 
     frame++;
     window.frame = frame;
@@ -974,8 +1066,6 @@ function loop() {
     }
 
     updatePlayer();
-
-    X.clearRect(0, 0, W, H);
 
     var targetCX = player.x - W * 0.35;
     cam.x += (targetCX - cam.x) * 0.08;
@@ -1029,7 +1119,6 @@ function loop() {
     X.translate(shake.x, shake.y);
 
     try {
-        drawSky();
         for (var i = 0; i < platforms.length; i++) { var pl = platforms[i]; drawPlatform(pl); for (var j = 0; j < pl.coins.length; j++) drawCoin(pl.coins[j]); }
         for (var i = 0; i < kameBlasts.length; i++) drawKame(kameBlasts[i]);
         for (var i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
@@ -1064,17 +1153,21 @@ function loop() {
     if (scV) scV.textContent = score;
     if (dsV) dsV.textContent = distance + 'm';
 
-    window.score = score; window.distance = distance;
-    window.player = player; window.platforms = platforms;
-    window.ghosts = ghosts; window.particles = particles;
-    window.projectiles = projectiles; window.kameBlasts = kameBlasts;
-    window.cam = cam; window.quakeCD = quakeCD; window.ghostTimer = ghostTimer;
+    window.score = score;
+    window.distance = distance;
+    window.player = player;
+    window.platforms = platforms;
+    window.ghosts = ghosts;
+    window.particles = particles;
+    window.projectiles = projectiles;
+    window.kameBlasts = kameBlasts;
+    window.cam = cam;
+    window.quakeCD = quakeCD;
+    window.ghostTimer = ghostTimer;
 }
 
 // === INIT ===
 setupTouch();
 loadSpriteSheet().then(function() {
-    // Loop akan dimulai dari startGame() atau restartGame()
-    // Tapi untuk pertama kali, kita mulai dari menu
     console.log('✅ Game loaded. Tekan ENTER atau klik tombol untuk mulai.');
 });
