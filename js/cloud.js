@@ -8,6 +8,9 @@ var cloudLoaded = false;
 var CLOUD_SCALE = 1.0;
 var CLOUD_URL = 'assets/images/awan%20pinton.png';
 
+// === FLAG UNTUK MENCEGAH GAMBAR BERGANDA ===
+var _cloudDrawnThisFrame = false;
+
 // ============================================
 // MUAT GAMBAR AWAN
 // ============================================
@@ -35,7 +38,7 @@ function loadCloudImage() {
 }
 
 // ============================================
-// GAMBAR AWAN DI BAWAH KARAKTER
+// GAMBAR AWAN DI BAWAH KARAKTER (HANYA 1)
 // ============================================
 function drawCloud(p, sx, sy, frame) {
     // Hanya gambar jika karakter di atas awan
@@ -43,6 +46,11 @@ function drawCloud(p, sx, sy, frame) {
     
     var X = window.X;
     if (!X) return;
+
+    // ===== CEK APAKAH SUDAH DIGAMBAR DI FRAME INI =====
+    // Ini mencegah penggambaran berganda dalam 1 frame
+    if (_cloudDrawnThisFrame) return;
+    _cloudDrawnThisFrame = true;
 
     // Jika gambar awan gagal dimuat, pakai fallback
     if (!cloudLoaded || !cloudImage) {
@@ -65,6 +73,9 @@ function drawCloud(p, sx, sy, frame) {
     X.translate(0, floatOffset);
     X.rotate(rot);
     
+    // === CLEAR AREA AWAN SEBELUM MENGGAMBAR ===
+    X.clearRect(cloudX - 20, cloudY - 20, cloudW + 40, cloudH + 40);
+    
     // Gambar awan
     X.globalAlpha = 0.9;
     X.drawImage(cloudImage, cloudX, cloudY, cloudW, cloudH);
@@ -83,6 +94,13 @@ function drawCloud(p, sx, sy, frame) {
 }
 
 // ============================================
+// RESET FLAG SETIAP FRAME (dipanggil dari game.js)
+// ============================================
+function resetCloudFrame() {
+    _cloudDrawnThisFrame = false;
+}
+
+// ============================================
 // FALLBACK: Awan Canvas (jika gambar gagal)
 // ============================================
 function drawCloudFallback(sx, sy) {
@@ -92,7 +110,6 @@ function drawCloudFallback(sx, sy) {
     X.save();
     var cy = window.PH / 2 - 2;
     
-    // Gambar awan sederhana dengan canvas
     X.beginPath();
     X.arc(-10, cy, 11, 0, 6.28);
     X.arc(10, cy, 11, 0, 6.28);
