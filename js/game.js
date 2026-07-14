@@ -938,9 +938,13 @@ function drawPlayer() {
     X.save();
     X.translate(sx, sy);
 
-    // === GAMBAR AWAN (HANYA 1 KALI) ===
+    // === GAMBAR AWAN (DENGAN TRY-CATCH) ===
     if (typeof drawCloud === 'function') {
-        drawCloud(p, sx, sy, frame);
+        try { 
+            drawCloud(p, sx, sy, frame); 
+        } catch(cloudErr) { 
+            console.warn('drawCloud error (dilewati):', cloudErr); 
+        }
     }
 
     // === Efek Kamehameha charge ===
@@ -965,92 +969,96 @@ function drawPlayer() {
     }
 
     // === GAMBAR SPRITE ===
-    if (spriteReady && spriteData) {
-        var isMoving = Math.abs(p.vx) > 0.5 && p.onGround;
-        var isInAir = !p.onGround && !p.onCloud;
+    try {
+        if (spriteReady && spriteData) {
+            var isMoving = Math.abs(p.vx) > 0.5 && p.onGround;
+            var isInAir = !p.onGround && !p.onCloud;
 
-        if (isMoving) {
-            spriteAnimTimer += SPRITE_FPS / 60;
-            if (spriteAnimTimer >= 1) {
-                spriteAnimTimer -= 1;
-                currentSpriteFrame = (currentSpriteFrame + 1) % 4;
+            if (isMoving) {
+                spriteAnimTimer += SPRITE_FPS / 60;
+                if (spriteAnimTimer >= 1) {
+                    spriteAnimTimer -= 1;
+                    currentSpriteFrame = (currentSpriteFrame + 1) % 4;
+                }
+            } else if (isInAir) {
+                currentSpriteFrame = 2;
+                spriteAnimTimer = 0;
+            } else {
+                currentSpriteFrame = 0;
+                spriteAnimTimer = 0;
             }
-        } else if (isInAir) {
-            currentSpriteFrame = 2;
-            spriteAnimTimer = 0;
+
+            var fr = spriteData.frames[currentSpriteFrame];
+            if (fr) {
+                var sc = SPRITE_SCALE;
+                var drawW = fr.w * sc;
+                var drawH = fr.h * sc;
+                var drawX = -fr.ox * sc;
+                var drawY = (PH / 2) - fr.oy * sc;
+
+                X.save();
+                if (p.facing === -1) {
+                    X.scale(-1, 1);
+                    drawX = -drawX - drawW;
+                }
+
+                X.save();
+                X.globalAlpha = 0.2;
+                X.beginPath();
+                X.ellipse(0, PH / 2 + 2, drawW * 0.35, 4, 0, 0, 6.28);
+                X.fillStyle = '#000';
+                X.fill();
+                X.restore();
+
+                X.drawImage(spriteData.img, fr.x, fr.y, fr.w, fr.h, drawX, drawY, drawW, drawH);
+                X.restore();
+            }
         } else {
-            currentSpriteFrame = 0;
-            spriteAnimTimer = 0;
-        }
-
-        var fr = spriteData.frames[currentSpriteFrame];
-        if (fr) {
-            var sc = SPRITE_SCALE;
-            var drawW = fr.w * sc;
-            var drawH = fr.h * sc;
-            var drawX = -fr.ox * sc;
-            var drawY = (PH / 2) - fr.oy * sc;
-
-            X.save();
-            if (p.facing === -1) {
-                X.scale(-1, 1);
-                drawX = -drawX - drawW;
-            }
-
-            X.save();
-            X.globalAlpha = 0.2;
+            // FALLBACK
+            X.scale(p.facing, 1);
+            X.fillStyle = '#DAA520';
+            X.fillRect(-7, PH * 0.12, 6, 13);
+            X.fillRect(2, PH * 0.12, 6, 13);
+            X.fillStyle = '#333';
+            X.fillRect(-8, PH * 0.12 + 9, 8, 5);
+            X.fillRect(1, PH * 0.12 + 9, 8, 5);
             X.beginPath();
-            X.ellipse(0, PH / 2 + 2, drawW * 0.35, 4, 0, 0, 6.28);
-            X.fillStyle = '#000';
+            X.rect(-PW * 0.38, -PH * 0.13, PW * 0.76, PH * 0.32);
+            var bodyG = X.createLinearGradient(0, -PH * 0.13, 0, PH * 0.19);
+            bodyG.addColorStop(0, '#FFD700');
+            bodyG.addColorStop(1, '#CC8800');
+            X.fillStyle = bodyG;
             X.fill();
-            X.restore();
-
-            X.drawImage(spriteData.img, fr.x, fr.y, fr.w, fr.h, drawX, drawY, drawW, drawH);
-            X.restore();
+            X.beginPath();
+            X.arc(0, -PH * 0.28, 12, 0, 6.28);
+            var headG = X.createRadialGradient(-2, -PH * 0.31, 2, 0, -PH * 0.28, 12);
+            headG.addColorStop(0, '#FFE4C4');
+            headG.addColorStop(1, '#DEB887');
+            X.fillStyle = headG;
+            X.fill();
+            X.fillStyle = '#FF4500';
+            for (var i = -2; i <= 2; i++) { X.beginPath();
+                X.moveTo(i * 4.5 - 1.5, -PH * 0.28 - 11);
+                X.lineTo(i * 4.5, -PH * 0.28 - 11 - (i === 0 ? 9 : 5.5));
+                X.lineTo(i * 4.5 + 1.5, -PH * 0.28 - 11);
+                X.fill(); }
+            X.fillStyle = '#FFF';
+            X.beginPath();
+            X.ellipse(-4.5, -PH * 0.3, 3.5, 3, 0, 0, 6.28);
+            X.fill();
+            X.beginPath();
+            X.ellipse(4.5, -PH * 0.3, 3.5, 3, 0, 0, 6.28);
+            X.fill();
+            X.fillStyle = '#000';
+            X.beginPath();
+            X.arc(-3.5, -PH * 0.29, 1, 0, 6.28);
+            X.fill();
+            X.beginPath();
+            X.arc(5.5, -PH * 0.29, 1, 0, 6.28);
+            X.fill();
         }
-    } else {
-        // FALLBACK
-        X.scale(p.facing, 1);
-        X.fillStyle = '#DAA520';
-        X.fillRect(-7, PH * 0.12, 6, 13);
-        X.fillRect(2, PH * 0.12, 6, 13);
-        X.fillStyle = '#333';
-        X.fillRect(-8, PH * 0.12 + 9, 8, 5);
-        X.fillRect(1, PH * 0.12 + 9, 8, 5);
-        X.beginPath();
-        X.rect(-PW * 0.38, -PH * 0.13, PW * 0.76, PH * 0.32);
-        var bodyG = X.createLinearGradient(0, -PH * 0.13, 0, PH * 0.19);
-        bodyG.addColorStop(0, '#FFD700');
-        bodyG.addColorStop(1, '#CC8800');
-        X.fillStyle = bodyG;
-        X.fill();
-        X.beginPath();
-        X.arc(0, -PH * 0.28, 12, 0, 6.28);
-        var headG = X.createRadialGradient(-2, -PH * 0.31, 2, 0, -PH * 0.28, 12);
-        headG.addColorStop(0, '#FFE4C4');
-        headG.addColorStop(1, '#DEB887');
-        X.fillStyle = headG;
-        X.fill();
-        X.fillStyle = '#FF4500';
-        for (var i = -2; i <= 2; i++) { X.beginPath();
-            X.moveTo(i * 4.5 - 1.5, -PH * 0.28 - 11);
-            X.lineTo(i * 4.5, -PH * 0.28 - 11 - (i === 0 ? 9 : 5.5));
-            X.lineTo(i * 4.5 + 1.5, -PH * 0.28 - 11);
-            X.fill(); }
-        X.fillStyle = '#FFF';
-        X.beginPath();
-        X.ellipse(-4.5, -PH * 0.3, 3.5, 3, 0, 0, 6.28);
-        X.fill();
-        X.beginPath();
-        X.ellipse(4.5, -PH * 0.3, 3.5, 3, 0, 0, 6.28);
-        X.fill();
-        X.fillStyle = '#000';
-        X.beginPath();
-        X.arc(-3.5, -PH * 0.29, 1, 0, 6.28);
-        X.fill();
-        X.beginPath();
-        X.arc(5.5, -PH * 0.29, 1, 0, 6.28);
-        X.fill();
+    } catch(spriteErr) {
+        console.warn('Sprite render error (dilewati):', spriteErr);
     }
 
     if (p.onCloud) {
@@ -1296,7 +1304,10 @@ function initGame() {
 // === GAME LOOP ===
 function loop() {
     requestAnimationFrame(loop);
+    
+    // ✅ FIX: Cek state di awal
     if (state !== 'play') return;
+    
     frame++;
     window.frame = frame;
 
@@ -1382,7 +1393,7 @@ function loop() {
     }
 
     // ============================================
-    // GAME OVER - FIX
+    // GAME OVER - FIXED
     // ============================================
     if (player.hp <= 0 && state !== 'over') {
         state = 'over';
@@ -1395,53 +1406,71 @@ function loop() {
         var touchControls = document.getElementById('touchControls');
         if (touchControls) touchControls.classList.remove('show');
         console.log('💀 Game Over - Skor:', score, 'Jarak:', distance);
+        
+        // ✅ FIX: STOP langsung, jangan render lagi di frame ini
+        return;
     }
+
+    // ✅ FIX: Jangan render kalau state bukan 'play'
+    if (state !== 'play') return;
 
     // === RENDER ===
     X.save();
     X.translate(shake.x, shake.y);
-    drawSky();
 
-    for (var i = 0; i < platforms.length; i++) {
-        var pl = platforms[i];
-        drawPlatform(pl);
-        for (var j = 0; j < pl.coins.length; j++) drawCoin(pl.coins[j]);
-    }
+    try {
+        drawSky();
 
-    for (var i = 0; i < kameBlasts.length; i++) drawKame(kameBlasts[i]);
-    for (var i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
-    for (var i = 0; i < ghosts.length; i++) drawGhost(ghosts[i]);
-    drawPlayer();
+        for (var i = 0; i < platforms.length; i++) {
+            var pl = platforms[i];
+            drawPlatform(pl);
+            for (var j = 0; j < pl.coins.length; j++) drawCoin(pl.coins[j]);
+        }
 
-    for (var i = 0; i < particles.length; i++) {
-        var p = particles[i],
-            a = p.life / p.ml;
-        X.globalAlpha = a;
-        X.fillStyle = p.color;
-        X.beginPath();
-        X.arc(p.x - cam.x, p.y - cam.y, Math.max(0.5, p.size * a), 0, 6.28);
-        X.fill();
-        X.globalAlpha = 1;
-    }
+        for (var i = 0; i < kameBlasts.length; i++) drawKame(kameBlasts[i]);
+        for (var i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
+        for (var i = 0; i < ghosts.length; i++) drawGhost(ghosts[i]);
+        drawPlayer();
 
-    var vg = X.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(15,0,25,0.3)');
-    X.fillStyle = vg;
-    X.fillRect(-30, -30, W + 60, H + 60);
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i],
+                a = p.life / p.ml;
+            X.globalAlpha = a;
+            X.fillStyle = p.color;
+            X.beginPath();
+            X.arc(p.x - cam.x, p.y - cam.y, Math.max(0.5, p.size * a), 0, 6.28);
+            X.fill();
+            X.globalAlpha = 1;
+        }
 
-    if (player.hp < 30) {
-        var dp = Math.sin(frame * 0.12) * 0.1 + 0.1;
-        X.fillStyle = 'rgba(255,0,0,' + dp + ')';
+        var vg = X.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.7);
+        vg.addColorStop(0, 'rgba(0,0,0,0)');
+        vg.addColorStop(1, 'rgba(15,0,25,0.3)');
+        X.fillStyle = vg;
         X.fillRect(-30, -30, W + 60, H + 60);
+
+        if (player.hp < 30) {
+            var dp = Math.sin(frame * 0.12) * 0.1 + 0.1;
+            X.fillStyle = 'rgba(255,0,0,' + dp + ')';
+            X.fillRect(-30, -30, W + 60, H + 60);
+        }
+    } catch(renderErr) {
+        console.warn('Render error (dilewati):', renderErr);
     }
 
     X.restore();
 
-    document.getElementById('hpB').style.width = Math.max(0, player.hp / player.maxHp * 100) + '%';
-    document.getElementById('enB').style.width = Math.max(0, player.energy / player.maxEnergy * 100) + '%';
-    document.getElementById('scV').textContent = score;
-    document.getElementById('dsV').textContent = distance + 'm';
+    // ✅ FIX: Hanya update DOM saat state 'play'
+    if (state === 'play') {
+        var hpB = document.getElementById('hpB');
+        var enB = document.getElementById('enB');
+        var scV = document.getElementById('scV');
+        var dsV = document.getElementById('dsV');
+        if (hpB) hpB.style.width = Math.max(0, player.hp / player.maxHp * 100) + '%';
+        if (enB) enB.style.width = Math.max(0, player.energy / player.maxEnergy * 100) + '%';
+        if (scV) scV.textContent = score;
+        if (dsV) dsV.textContent = distance + 'm';
+    }
 
     window.score = score;
     window.distance = distance;
