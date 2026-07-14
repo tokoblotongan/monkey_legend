@@ -264,10 +264,58 @@ addEventListener('mouseup', function(e) { if (e.button === 0) mouseState.leftCli
 
 // === KEYBOARD ===
 addEventListener('keydown', function(e) {
-    var key = e.key.toLowerCase();
-    keys[key] = true;
+    var key = e.key;
+    var keyLower = key.toLowerCase();
     
-    if (e.key === 'Enter' || e.key === ' ') {
+    // === KONTROL BARU ===
+    // A = Tembak (Tongkat)
+    // S = Awan
+    // Cursor = Gerak
+    
+    // Tombol A (tembak)
+    if (key === 'a' || key === 'A') {
+        e.preventDefault();
+        keys['a'] = true;
+        keys['j'] = true; // alias untuk kompatibilitas
+    }
+    // Tombol S (awan)
+    else if (key === 's' || key === 'S') {
+        e.preventDefault();
+        keys['s'] = true;
+        keys['l'] = true; // alias untuk kompatibilitas
+        keys[' '] = true;
+    }
+    // Cursor Arrow
+    else if (key === 'ArrowRight') {
+        e.preventDefault();
+        keys['arrowright'] = true;
+        keys['d'] = true;
+    }
+    else if (key === 'ArrowLeft') {
+        e.preventDefault();
+        keys['arrowleft'] = true;
+        keys['a'] = false; // a untuk tembak, bukan gerak kiri
+        keys['d'] = false;
+    }
+    else if (key === 'ArrowUp') {
+        e.preventDefault();
+        keys['arrowup'] = true;
+        keys['w'] = true;
+    }
+    else if (key === 'ArrowDown') {
+        e.preventDefault();
+        keys['arrowdown'] = true;
+        keys['s'] = false; // s untuk awan, bukan turun
+        keys['w'] = false;
+    }
+    // Tombol lain (untuk kompatibilitas)
+    else if (['w', 'd', ' ', 'j', 'k', 'l'].indexOf(keyLower) >= 0) {
+        keys[keyLower] = true;
+        e.preventDefault();
+    }
+    
+    // Enter untuk mulai/restart
+    if (key === 'Enter') {
         e.preventDefault();
         if (state === 'menu') {
             if (typeof initAudio === 'function') initAudio();
@@ -276,14 +324,39 @@ addEventListener('keydown', function(e) {
             if (typeof initAudio === 'function') initAudio();
             restartGame();
         }
-        return;
     }
-    
-    if (['w', 'a', 's', 'd', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(key) >= 0) e.preventDefault();
 });
-addEventListener('keyup', function(e) { 
-    var key = e.key.toLowerCase();
-    keys[key] = false; 
+
+addEventListener('keyup', function(e) {
+    var key = e.key;
+    var keyLower = key.toLowerCase();
+    
+    if (key === 'a' || key === 'A') {
+        keys['a'] = false;
+        keys['j'] = false;
+    }
+    else if (key === 's' || key === 'S') {
+        keys['s'] = false;
+        keys['l'] = false;
+        keys[' '] = false;
+    }
+    else if (key === 'ArrowRight') {
+        keys['arrowright'] = false;
+        keys['d'] = false;
+    }
+    else if (key === 'ArrowLeft') {
+        keys['arrowleft'] = false;
+    }
+    else if (key === 'ArrowUp') {
+        keys['arrowup'] = false;
+        keys['w'] = false;
+    }
+    else if (key === 'ArrowDown') {
+        keys['arrowdown'] = false;
+    }
+    else if (['w', 'd', ' ', 'j', 'k', 'l'].indexOf(keyLower) >= 0) {
+        keys[keyLower] = false;
+    }
 });
 
 // === TOUCH ===
