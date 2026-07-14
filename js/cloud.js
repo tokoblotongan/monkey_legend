@@ -6,7 +6,7 @@
 var cloudImage = null;
 var cloudLoaded = false;
 var CLOUD_SCALE = 1.0;
-var CLOUD_URL = 'assets/images/awan%20pinton.png';
+var CLOUD_URL = 'assets/images/awan1.png';
 
 // === FLAG UNTUK MENCEGAH GAMBAR BERGANDA ===
 var _cloudDrawnThisFrame = false;
