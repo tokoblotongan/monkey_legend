@@ -263,50 +263,49 @@ addEventListener('mousedown', function(e) { if (e.button === 0) mouseState.leftC
 addEventListener('mouseup', function(e) { if (e.button === 0) mouseState.leftClick = false; });
 
 // ============================================
-// KEYBOARD - KONTROL FINAL
+// KEYBOARD - REVISI KONTROL FINAL
 // ============================================
 addEventListener('keydown', function(e) {
     var key = e.key;
     var keyLower = key.toLowerCase();
 
-    // A = TEMBAK (BUKAN GERAK KIRI!)
+    // A = TEMBAK
     if (key === 'a' || key === 'A') {
         e.preventDefault();
         keys['a'] = true;
-        keys['j'] = true;
     }
-    // S = AWAN (BUKAN TURUN!)
+    // S = AWAN
     else if (key === 's' || key === 'S') {
         e.preventDefault();
         keys['s'] = true;
-        keys['l'] = true;
         keys[' '] = true;
     }
     // CURSOR = GERAK
     else if (key === 'ArrowRight') {
         e.preventDefault();
         keys['arrowright'] = true;
-        keys['d'] = true;
     }
     else if (key === 'ArrowLeft') {
         e.preventDefault();
         keys['arrowleft'] = true;
-        // JANGAN sentuh keys['a'] !!!
     }
     else if (key === 'ArrowUp') {
         e.preventDefault();
         keys['arrowup'] = true;
-        keys['w'] = true;
     }
     else if (key === 'ArrowDown') {
         e.preventDefault();
         keys['arrowdown'] = true;
-        // JANGAN sentuh keys['s'] !!!
     }
-    // Tombol lain (kompatibilitas)
-    else if (['w', 'd', ' ', 'j', 'k', 'l'].indexOf(keyLower) >= 0) {
-        keys[keyLower] = true;
+    // K = Kamehameha
+    else if (key === 'k' || key === 'K') {
         e.preventDefault();
+        keys['k'] = true;
+    }
+    // Spasi = Awan (alias)
+    else if (key === ' ') {
+        e.preventDefault();
+        keys[' '] = true;
     }
 
     // Enter
@@ -328,29 +327,28 @@ addEventListener('keyup', function(e) {
 
     if (key === 'a' || key === 'A') {
         keys['a'] = false;
-        keys['j'] = false;
     }
     else if (key === 's' || key === 'S') {
         keys['s'] = false;
-        keys['l'] = false;
         keys[' '] = false;
     }
     else if (key === 'ArrowRight') {
         keys['arrowright'] = false;
-        keys['d'] = false;
     }
     else if (key === 'ArrowLeft') {
         keys['arrowleft'] = false;
     }
     else if (key === 'ArrowUp') {
         keys['arrowup'] = false;
-        keys['w'] = false;
     }
     else if (key === 'ArrowDown') {
         keys['arrowdown'] = false;
     }
-    else if (['w', 'd', ' ', 'j', 'k', 'l'].indexOf(keyLower) >= 0) {
-        keys[keyLower] = false;
+    else if (key === 'k' || key === 'K') {
+        keys['k'] = false;
+    }
+    else if (key === ' ') {
+        keys[' '] = false;
     }
 });
 
@@ -849,22 +847,18 @@ function triggerQuake() {
 }
 
 // ============================================
-// GET INPUT - KONTROL FINAL
+// GET INPUT - REVISI KONTROL FINAL
 // ============================================
 function getInput() {
-    // LEFT = HANYA ArrowLeft (BUKAN A!)
-    var left = keys['arrowleft'] || keys['d'] || (touchState.moveX < -0.3);
+    var left = keys['arrowleft'] || (touchState.moveX < -0.3);
     var right = keys['arrowright'] || (touchState.moveX > 0.3);
-    var up = keys['arrowup'] || keys['w'] || touchState.jump;
+    var up = keys['arrowup'] || keys[' '] || touchState.jump;
     var down = keys['arrowdown'] || touchState.down;
-    
-    // ATK = HANYA J atau A (BUKAN ArrowLeft!)
-    var atk = keys['j'] || keys['a'] || mouseState.leftClick || touchState.atk;
-    
+    var atk = keys['a'] || touchState.atk;
+    var cloud = keys['s'] || touchState.cloud;
     var kame = keys['k'] || touchState.kame;
-    var cloud = keys['l'] || keys[' '] || touchState.cloud;
     
-    return { left: left, right: right, up: up, down: down, atk: atk, kame: kame, cloud: cloud };
+    return { left: left, right: right, up: up, down: down, atk: atk, cloud: cloud, kame: kame };
 }
 
 // === PEMAIN ===
@@ -877,7 +871,7 @@ function createPlayer() {
 function updatePlayer() {
     var p = player, inp = getInput();
     
-    // GERAKAN: hanya dari ArrowLeft/ArrowRight (BUKAN A!)
+    // GERAKAN: hanya dari ArrowLeft/ArrowRight
     if (inp.left) { p.vx = -SPEED; p.facing = -1; }
     else if (inp.right) { p.vx = SPEED; p.facing = 1; }
     else p.vx *= 0.78;
