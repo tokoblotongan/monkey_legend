@@ -129,7 +129,7 @@ function loadSpriteSheet() {
         loadFill.style.width = '20%';
 
         var loadedCount = 0;
-        var totalToLoad = 2; // sprite + cloud
+        var totalToLoad = 2;
 
         function checkComplete() {
             loadedCount++;
@@ -144,7 +144,6 @@ function loadSpriteSheet() {
             }
         }
 
-        // Muat sprite karakter
         img.onload = function() {
             loadFill.style.width = '40%';
             loadText.textContent = 'Memproses sprite...';
@@ -162,7 +161,6 @@ function loadSpriteSheet() {
         };
         img.src = SPRITE_URL;
 
-        // Muat gambar awan dari cloud.js
         if (typeof loadCloudImage === 'function') {
             loadCloudImage().then(function() {
                 loadFill.style.width = '80%';
@@ -172,7 +170,6 @@ function loadSpriteSheet() {
                 checkComplete();
             });
         } else {
-            // Jika cloud.js tidak dimuat, tetap lanjut
             checkComplete();
         }
     });
@@ -186,7 +183,6 @@ function initAudio() { if (!ac) try { ac = new(window.AudioContext || window.web
 window.ac = ac;
 window.initAudio = initAudio;
 
-// Sound effects
 window.sfxJump = function() { tone(300, 0.15, 'sine', 0.1, 600); };
 window.sfxAtk = function() { tone(500, 0.08, 'sawtooth', 0.08, 250); };
 window.sfxKame = function() {
@@ -224,7 +220,6 @@ var spriteAnimTimer = 0;
 var SPRITE_FPS = 7;
 var currentSpriteFrame = 0;
 
-// Ekspose ke global
 window.state = state;
 window.score = score;
 window.distance = distance;
@@ -272,7 +267,6 @@ addEventListener('keydown', function(e) {
     var key = e.key.toLowerCase();
     keys[key] = true;
     
-    // Tangani Enter
     if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         if (state === 'menu') {
@@ -426,7 +420,6 @@ document.addEventListener('touchmove', function(e) { if (state === 'play') e.pre
 
 // === MULAI GAME ===
 function startGame() {
-    // Pastikan audio aktif
     if (typeof initAudio === 'function') {
         try { initAudio(); } catch(e) {}
     }
@@ -438,7 +431,6 @@ function startGame() {
 }
 
 function restartGame() {
-    // Pastikan audio aktif
     if (typeof initAudio === 'function') {
         try { initAudio(); } catch(e) {}
     }
@@ -741,7 +733,6 @@ function activateCloud() {
     sfxCloud();
     spawnP(player.x, player.y + PH / 2, 10, '#FFF8DC', 0.9, 0.7);
 
-    // Partikel dari cloud.js
     if (typeof spawnCloudParticles === 'function') {
         spawnCloudParticles(player);
     }
@@ -790,7 +781,7 @@ function triggerQuake() {
 }
 
 // ============================================
-// DRAW PLAYER — SPRITE SHEET VERSION
+// DRAW PLAYER — DENGAN CLEAR CANVAS
 // ============================================
 function drawPlayer() {
     var p = player,
@@ -803,6 +794,7 @@ function drawPlayer() {
     X.translate(sx, sy);
 
     // === GAMBAR AWAN (HANYA 1 KALI) ===
+    // Pastikan awan digambar di bawah karakter
     if (typeof drawCloud === 'function') {
         drawCloud(p, sx, sy, frame);
     }
@@ -861,7 +853,6 @@ function drawPlayer() {
                 drawX = -drawX - drawW;
             }
 
-            // Bayangan
             X.save();
             X.globalAlpha = 0.2;
             X.beginPath();
@@ -874,7 +865,7 @@ function drawPlayer() {
             X.restore();
         }
     } else {
-        // === FALLBACK: Karakter canvas ===
+        // FALLBACK
         X.scale(p.facing, 1);
         X.fillStyle = '#DAA520';
         X.fillRect(-7, PH * 0.12, 6, 13);
@@ -918,7 +909,6 @@ function drawPlayer() {
         X.fill();
     }
 
-    // === Glow awan ===
     if (p.onCloud) {
         var ag = X.createRadialGradient(0, 0, PW * 0.3, 0, 0, PW * 1.1);
         ag.addColorStop(0, 'rgba(255,215,0,0.12)');
@@ -1148,7 +1138,6 @@ function initGame() {
         jthumb.style.top = '50%'; }
     SPRITE_SCALE = calcSpriteScale();
 
-    // Update global
     window.score = score;
     window.distance = distance;
     window.frame = frame;
@@ -1169,7 +1158,7 @@ function loop() {
 
     updatePlayer();
 
-    // === CLEAR CANVAS SETIAP FRAME ===
+    // ===== CLEAR CANVAS SETIAP FRAME =====
     X.clearRect(0, 0, W, H);
 
     var targetCX = player.x - W * 0.35;
@@ -1294,13 +1283,11 @@ function loop() {
 
     X.restore();
 
-    // Update UI
     document.getElementById('hpB').style.width = Math.max(0, player.hp / player.maxHp * 100) + '%';
     document.getElementById('enB').style.width = Math.max(0, player.energy / player.maxEnergy * 100) + '%';
     document.getElementById('scV').textContent = score;
     document.getElementById('dsV').textContent = distance + 'm';
 
-    // Update global
     window.score = score;
     window.distance = distance;
     window.player = player;
