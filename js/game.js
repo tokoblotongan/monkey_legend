@@ -263,26 +263,26 @@ addEventListener('mousedown', function(e) { if (e.button === 0) mouseState.leftC
 addEventListener('mouseup', function(e) { if (e.button === 0) mouseState.leftClick = false; });
 
 // ============================================
-// KEYBOARD - KONTROL REVISI
+// KEYBOARD - KONTROL FINAL
 // ============================================
 addEventListener('keydown', function(e) {
     var key = e.key;
     var keyLower = key.toLowerCase();
 
-    // A = Tembak (Tongkat)
+    // A = TEMBAK (BUKAN GERAK KIRI!)
     if (key === 'a' || key === 'A') {
         e.preventDefault();
         keys['a'] = true;
-        keys['j'] = true; // alias untuk kompatibilitas
+        keys['j'] = true;
     }
-    // S = Awan
+    // S = AWAN (BUKAN TURUN!)
     else if (key === 's' || key === 'S') {
         e.preventDefault();
         keys['s'] = true;
-        keys['l'] = true; // alias untuk kompatibilitas
+        keys['l'] = true;
         keys[' '] = true;
     }
-    // Cursor Arrow
+    // CURSOR = GERAK
     else if (key === 'ArrowRight') {
         e.preventDefault();
         keys['arrowright'] = true;
@@ -291,7 +291,7 @@ addEventListener('keydown', function(e) {
     else if (key === 'ArrowLeft') {
         e.preventDefault();
         keys['arrowleft'] = true;
-        // HAPUS: keys['a'] = false; // A untuk tembak, BUKAN gerak kiri!
+        // JANGAN sentuh keys['a'] !!!
     }
     else if (key === 'ArrowUp') {
         e.preventDefault();
@@ -301,15 +301,15 @@ addEventListener('keydown', function(e) {
     else if (key === 'ArrowDown') {
         e.preventDefault();
         keys['arrowdown'] = true;
-        // HAPUS: keys['s'] = false; // S untuk awan, BUKAN turun!
+        // JANGAN sentuh keys['s'] !!!
     }
-    // Tombol lain (untuk kompatibilitas)
+    // Tombol lain (kompatibilitas)
     else if (['w', 'd', ' ', 'j', 'k', 'l'].indexOf(keyLower) >= 0) {
         keys[keyLower] = true;
         e.preventDefault();
     }
 
-    // Enter untuk mulai/restart
+    // Enter
     if (key === 'Enter') {
         e.preventDefault();
         if (state === 'menu') {
@@ -849,6 +849,87 @@ function triggerQuake() {
 }
 
 // ============================================
+// GET INPUT - KONTROL FINAL
+// ============================================
+function getInput() {
+    // LEFT = HANYA ArrowLeft (BUKAN A!)
+    var left = keys['arrowleft'] || keys['d'] || (touchState.moveX < -0.3);
+    var right = keys['arrowright'] || (touchState.moveX > 0.3);
+    var up = keys['arrowup'] || keys['w'] || touchState.jump;
+    var down = keys['arrowdown'] || touchState.down;
+    
+    // ATK = HANYA J atau A (BUKAN ArrowLeft!)
+    var atk = keys['j'] || keys['a'] || mouseState.leftClick || touchState.atk;
+    
+    var kame = keys['k'] || touchState.kame;
+    var cloud = keys['l'] || keys[' '] || touchState.cloud;
+    
+    return { left: left, right: right, up: up, down: down, atk: atk, kame: kame, cloud: cloud };
+}
+
+// === PEMAIN ===
+function createPlayer() {
+    return { x: 200, y: H - 200, vx: 0, vy: 0, hp: 100, maxHp: 100, energy: 100, maxEnergy: 100,
+        facing: 1, onGround: false, onCloud: false, cloudTimer: 0, inv: 0, atkCD: 0, kameCharge: 0,
+        jumps: 2, dropThrough: 0, _jumpHeld: false, _cloudHeld: false, _atkHeld: false, _kameHeld: false };
+}
+
+function updatePlayer() {
+    var p = player, inp = getInput();
+    
+    // GERAKAN: hanya dari ArrowLeft/ArrowRight (BUKAN A!)
+    if (inp.left) { p.vx = -SPEED; p.facing = -1; }
+    else if (inp.right) { p.vx = SPEED; p.facing = 1; }
+    else p.vx *= 0.78;
+
+    // Lompat
+    if (inp.up && !p._jumpHeld) {
+        if (p.onCloud) { p.onCloud = false; p.cloudTimer = 0; p.vy = JUMP * 0.8; p.jumps = 1; }
+        else if (p.jumps > 0) { p.vy = JUMP; p.jumps--; p.onGround = false; sfxJump(); spawnP(p.x, p.y + PH / 2, 4, '#FFD700', 0.5, 0.5); }
+        p._jumpHeld = true;
+    }
+    if (!inp.up) p._jumpHeld = false;
+
+    if (inp.down) p.dropThrough = 8;
+
+    // Awan
+    if (inp.cloud && !p._cloudHeld) { activateCloud(); p._cloudHeld = true; }
+    if (!inp.cloud) p._cloudHeld = false;
+
+    // Tembak
+    if (inp.atk) fireStaff();
+
+    // Kamehameha
+    if (inp.kame) { p.kameCharge = Math.min(60, p.kameCharge + 1); }
+    else if (p.kameCharge > 10) { fireKame(); }
+    else { p.kameCharge = 0; }
+
+    // Fisika
+    if (p.onCloud) {
+        p.vy = 0;
+        if (inp.up) p.vy = -3.2;
+        if (inp.down) p.vy = 3;
+        p.cloudTimer--; p.energy -= 0.15;
+        if (p.cloudTimer <= 0 || p.energy <= 0) p.onCloud = false;
+        if (frame % 3 === 0) particles.push({ x: p.x + rnd(-14, 14), y: p.y + PH / 2 + rnd(0, 8), vx: rnd(-0.4, 0.4), vy: rnd(0.5, 1.8), life: rnd(12, 22), ml: 22, size: rnd(3, 7), color: 'rgba(255,255,255,0.35)' });
+    } else { p.vy += GRAV; if (p.vy > MAX_FALL) p.vy = MAX_FALL; }
+
+    p.x += p.vx; p.y += p.vy; if (p.dropThrough > 0) p.dropThrough--;
+    p.onGround = false;
+    for (var i = 0; i < platforms.length; i++) {
+        var pl = platforms[i]; if (p.dropThrough > 0 && pl.type !== 'ground') continue;
+        var px = p.x - PW / 2, py = p.y - PH / 2;
+        if (px + PW > pl.x && px < pl.x + pl.w) {
+            var prevBottom = py + PH - p.vy;
+            if (prevBottom <= pl.y + 5 && py + PH >= pl.y && py + PH <= pl.y + pl.h + 10) { p.y = pl.y - PH / 2; p.vy = 0; p.onGround = true; p.jumps = 2; }
+        }
+    }
+    if (p.y > H + 120) { p.hp -= 20; p.inv = 60; p.x = cam.x + W / 2; p.y = 100; p.vy = 0; triggerShake(8, 15); }
+    for (var i = 0; i < platforms.length; i++) { var pl = platforms[i]; for (var j = 0; j < pl.coins.length; j++) { var c = pl.coins[j]; if (!c.collected && Math.hypot(p.x - c.x, p.y - c.y) < 24) { c.collected = true; score += 50; sfxCoin(); spawnP(c.x, c.y, 5, '#FFD700', 0.8, 0.6); } } }
+    if (!p.onCloud) p.energy = Math.min(p.maxEnergy, p.energy + 0.06); if (p.inv > 0) p.inv--; if (p.atkCD > 0) p.atkCD--;
+}
+
+// ============================================
 // DRAW PLAYER
 // ============================================
 function drawPlayer() {
@@ -1223,7 +1304,6 @@ function loop() {
     frame++;
     window.frame = frame;
 
-    // ===== RESET FLAG CLOUD SETIAP FRAME =====
     if (typeof resetCloudFrame === 'function') {
         resetCloudFrame();
     }
