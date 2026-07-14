@@ -263,7 +263,7 @@ addEventListener('mousedown', function(e) { if (e.button === 0) mouseState.leftC
 addEventListener('mouseup', function(e) { if (e.button === 0) mouseState.leftClick = false; });
 
 // ============================================
-// KEYBOARD - REVISI KONTROL FINAL
+// KEYBOARD - REVISI KONTROL FINAL (D = KAMEHAMEHA)
 // ============================================
 addEventListener('keydown', function(e) {
     var key = e.key;
@@ -279,6 +279,12 @@ addEventListener('keydown', function(e) {
         e.preventDefault();
         keys['s'] = true;
         keys[' '] = true;
+    }
+    // D = KAMEHAMEHA
+    else if (key === 'd' || key === 'D') {
+        e.preventDefault();
+        keys['d'] = true;
+        keys['k'] = true;
     }
     // CURSOR = GERAK
     else if (key === 'ArrowRight') {
@@ -296,11 +302,6 @@ addEventListener('keydown', function(e) {
     else if (key === 'ArrowDown') {
         e.preventDefault();
         keys['arrowdown'] = true;
-    }
-    // K = Kamehameha
-    else if (key === 'k' || key === 'K') {
-        e.preventDefault();
-        keys['k'] = true;
     }
     // Spasi = Awan (alias)
     else if (key === ' ') {
@@ -332,6 +333,10 @@ addEventListener('keyup', function(e) {
         keys['s'] = false;
         keys[' '] = false;
     }
+    else if (key === 'd' || key === 'D') {
+        keys['d'] = false;
+        keys['k'] = false;
+    }
     else if (key === 'ArrowRight') {
         keys['arrowright'] = false;
     }
@@ -343,9 +348,6 @@ addEventListener('keyup', function(e) {
     }
     else if (key === 'ArrowDown') {
         keys['arrowdown'] = false;
-    }
-    else if (key === 'k' || key === 'K') {
-        keys['k'] = false;
     }
     else if (key === ' ') {
         keys[' '] = false;
@@ -847,7 +849,7 @@ function triggerQuake() {
 }
 
 // ============================================
-// GET INPUT - REVISI KONTROL FINAL
+// GET INPUT - REVISI KONTROL FINAL (D = KAMEHAMEHA)
 // ============================================
 function getInput() {
     var left = keys['arrowleft'] || (touchState.moveX < -0.3);
@@ -856,7 +858,7 @@ function getInput() {
     var down = keys['arrowdown'] || touchState.down;
     var atk = keys['a'] || touchState.atk;
     var cloud = keys['s'] || touchState.cloud;
-    var kame = keys['k'] || touchState.kame;
+    var kame = keys['d'] || keys['k'] || touchState.kame;
     
     return { left: left, right: right, up: up, down: down, atk: atk, cloud: cloud, kame: kame };
 }
