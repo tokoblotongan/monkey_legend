@@ -802,7 +802,7 @@ function drawPlayer() {
     X.save();
     X.translate(sx, sy);
 
-    // === GAMBAR AWAN DARI CLOUD.JS ===
+    // === GAMBAR AWAN (HANYA 1 KALI) ===
     if (typeof drawCloud === 'function') {
         drawCloud(p, sx, sy, frame);
     }
@@ -1168,6 +1168,9 @@ function loop() {
     window.frame = frame;
 
     updatePlayer();
+
+    // === CLEAR CANVAS SETIAP FRAME ===
+    X.clearRect(0, 0, W, H);
 
     var targetCX = player.x - W * 0.35;
     cam.x += (targetCX - cam.x) * 0.08;
