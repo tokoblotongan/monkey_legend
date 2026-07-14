@@ -262,23 +262,20 @@ window.mouseState = mouseState;
 addEventListener('mousedown', function(e) { if (e.button === 0) mouseState.leftClick = true; });
 addEventListener('mouseup', function(e) { if (e.button === 0) mouseState.leftClick = false; });
 
-// === KEYBOARD ===
+// ============================================
+// KEYBOARD - KONTROL REVISI
+// ============================================
 addEventListener('keydown', function(e) {
     var key = e.key;
     var keyLower = key.toLowerCase();
-    
-    // === KONTROL BARU ===
+
     // A = Tembak (Tongkat)
-    // S = Awan
-    // Cursor = Gerak
-    
-    // Tombol A (tembak)
     if (key === 'a' || key === 'A') {
         e.preventDefault();
         keys['a'] = true;
         keys['j'] = true; // alias untuk kompatibilitas
     }
-    // Tombol S (awan)
+    // S = Awan
     else if (key === 's' || key === 'S') {
         e.preventDefault();
         keys['s'] = true;
@@ -294,8 +291,7 @@ addEventListener('keydown', function(e) {
     else if (key === 'ArrowLeft') {
         e.preventDefault();
         keys['arrowleft'] = true;
-        keys['a'] = false; // a untuk tembak, bukan gerak kiri
-        keys['d'] = false;
+        // HAPUS: keys['a'] = false; // A untuk tembak, BUKAN gerak kiri!
     }
     else if (key === 'ArrowUp') {
         e.preventDefault();
@@ -305,15 +301,14 @@ addEventListener('keydown', function(e) {
     else if (key === 'ArrowDown') {
         e.preventDefault();
         keys['arrowdown'] = true;
-        keys['s'] = false; // s untuk awan, bukan turun
-        keys['w'] = false;
+        // HAPUS: keys['s'] = false; // S untuk awan, BUKAN turun!
     }
     // Tombol lain (untuk kompatibilitas)
     else if (['w', 'd', ' ', 'j', 'k', 'l'].indexOf(keyLower) >= 0) {
         keys[keyLower] = true;
         e.preventDefault();
     }
-    
+
     // Enter untuk mulai/restart
     if (key === 'Enter') {
         e.preventDefault();
@@ -330,7 +325,7 @@ addEventListener('keydown', function(e) {
 addEventListener('keyup', function(e) {
     var key = e.key;
     var keyLower = key.toLowerCase();
-    
+
     if (key === 'a' || key === 'A') {
         keys['a'] = false;
         keys['j'] = false;
