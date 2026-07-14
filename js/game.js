@@ -1,5 +1,5 @@
 // ============================================
-// MONKEY LEGEND - GAME ENGINE (FIXED)
+// MONKEY LEGEND - GAME ENGINE (FINAL FIX)
 // ============================================
 
 // === CANVAS ===
@@ -10,7 +10,6 @@ var W, H;
 function resize() {
     W = C.width = innerWidth;
     H = C.height = innerHeight;
-    // FIX #1: Selalu sinkronkan window.W dan window.H saat resize
     window.W = W;
     window.H = H;
 }
@@ -208,6 +207,11 @@ var spriteAnimTimer = 0;
 var SPRITE_FPS = 7;
 var currentSpriteFrame = 0;
 
+// ============================================
+// FIX: ANIMATION ID UNTUK CANCEL LOOP
+// ============================================
+var animationId = null;
+
 window.state      = state;
 window.score      = score;
 window.distance   = distance;
@@ -226,6 +230,7 @@ window.genX       = genX;
 window.ghostTimer = ghostTimer;
 window.spriteAnimTimer    = spriteAnimTimer;
 window.currentSpriteFrame = currentSpriteFrame;
+window.animationId        = animationId;
 
 // === KONSTANTA ===
 var GRAV = 0.52, JUMP = -11.5, SPEED = 4.8, MAX_FALL = 14;
@@ -365,10 +370,16 @@ function updateJoystick(clientX, clientY, maxR, jthumb) {
 document.addEventListener('touchmove', function(e) { if (state === 'play') e.preventDefault(); }, { passive: false });
 
 // ============================================
-// FIX #2: Fungsi triggerGameOver tersendiri
+// FIX: FUNGSI TRIGGER GAME OVER DENGAN CANCEL LOOP
 // ============================================
 function triggerGameOver() {
-    // Langsung set kedua variabel secara atomik
+    // Hentikan loop sepenuhnya
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+        window.animationId = null;
+    }
+
     state = 'over';
     window.state = 'over';
 
@@ -383,7 +394,7 @@ function triggerGameOver() {
     var touchControls = document.getElementById('touchControls');
     if (touchControls) touchControls.classList.remove('show');
 
-    // Reset semua input agar tidak ada input "hantu" saat restart
+    // Reset semua input
     for (var k in keys) keys[k] = false;
     touchState.jump = false; touchState.atk = false;
     touchState.kame = false; touchState.cloud = false;
@@ -393,23 +404,45 @@ function triggerGameOver() {
     console.log('💀 Game Over - Skor:', score, 'Jarak:', distance);
 }
 
-// === MULAI / RESTART GAME ===
+// ============================================
+// MULAI / RESTART GAME - DENGAN CANCEL LOOP
+// ============================================
 function startGame() {
+    // Hentikan loop yang sedang berjalan
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+        window.animationId = null;
+    }
+
     if (typeof initAudio === 'function') { try { initAudio(); } catch(e) {} }
     initGame();
     state = 'play';
     window.state = state;
     document.getElementById('overlay').classList.add('hidden');
     if (isTouchDevice) document.getElementById('touchControls').classList.add('show');
+    
+    // Mulai loop baru
+    loop();
 }
 
 function restartGame() {
+    // Hentikan loop yang sedang berjalan
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+        window.animationId = null;
+    }
+
     if (typeof initAudio === 'function') { try { initAudio(); } catch(e) {} }
     initGame();
     state = 'play';
     window.state = state;
     document.getElementById('gameover').classList.remove('show');
     if (isTouchDevice) document.getElementById('touchControls').classList.add('show');
+    
+    // Mulai loop baru
+    loop();
 }
 
 document.getElementById('startBtn').addEventListener('click', function(e) { if (typeof initAudio === 'function') initAudio(); startGame(); });
@@ -677,7 +710,6 @@ function updatePlayer() {
         }
     }
 
-    // FIX #3: Saat jatuh, kurangi hp tapi JANGAN kurangi lagi kalau sudah <= 0
     if (p.y > H + 120) {
         if (p.hp > 0) {
             p.hp -= 20;
@@ -921,12 +953,13 @@ function initGame() {
 }
 
 // ============================================
-// GAME LOOP - FIXED
+// GAME LOOP - DENGAN CANCEL ANIMATION FRAME
 // ============================================
 function loop() {
-    requestAnimationFrame(loop);
+    animationId = requestAnimationFrame(loop);
+    window.animationId = animationId;
 
-    // FIX #4: Hanya jalankan logic jika state === 'play'
+    // Hanya jalankan logic jika state === 'play'
     if (state !== 'play') return;
 
     frame++;
@@ -934,8 +967,7 @@ function loop() {
 
     if (typeof resetCloudFrame === 'function') resetCloudFrame();
 
-    // FIX #5: Cek hp SEBELUM update player, bukan sesudah
-    // Ini mencegah updatePlayer() berjalan saat hp sudah 0
+    // Cek hp SEBELUM update player
     if (player.hp <= 0) {
         triggerGameOver();
         return;
@@ -1022,7 +1054,7 @@ function loop() {
 
     X.restore();
 
-    // Update UI (hanya saat play, sudah aman karena kita return early di atas)
+    // Update UI
     var hpB = document.getElementById('hpB');
     var enB = document.getElementById('enB');
     var scV = document.getElementById('scV');
@@ -1042,5 +1074,7 @@ function loop() {
 // === INIT ===
 setupTouch();
 loadSpriteSheet().then(function() {
-    loop();
+    // Loop akan dimulai dari startGame() atau restartGame()
+    // Tapi untuk pertama kali, kita mulai dari menu
+    console.log('✅ Game loaded. Tekan ENTER atau klik tombol untuk mulai.');
 });
