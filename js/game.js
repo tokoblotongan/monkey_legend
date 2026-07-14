@@ -781,7 +781,7 @@ function triggerQuake() {
 }
 
 // ============================================
-// DRAW PLAYER — DENGAN CLEAR CANVAS
+// DRAW PLAYER
 // ============================================
 function drawPlayer() {
     var p = player,
@@ -794,7 +794,6 @@ function drawPlayer() {
     X.translate(sx, sy);
 
     // === GAMBAR AWAN (HANYA 1 KALI) ===
-    // Pastikan awan digambar di bawah karakter
     if (typeof drawCloud === 'function') {
         drawCloud(p, sx, sy, frame);
     }
@@ -1155,6 +1154,11 @@ function loop() {
     if (state !== 'play') return;
     frame++;
     window.frame = frame;
+
+    // ===== RESET FLAG CLOUD SETIAP FRAME =====
+    if (typeof resetCloudFrame === 'function') {
+        resetCloudFrame();
+    }
 
     updatePlayer();
 
