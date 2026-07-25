@@ -34,6 +34,14 @@ var spriteReady = false;
 var SPRITE_SCALE = 1.0;
 var SPRITE_URL = 'assets/images/Lari%20hadap%20depan.png';
 
+// === SPRITE LOMPAT ===
+var jumpSpriteData = null;
+var jumpSpriteReady = false;
+var JUMP_SPRITE_URL = 'assets/images/lompat.png';
+var jumpAnimTimer = 0;
+var currentJumpFrame = 0;
+var JUMP_SPRITE_FPS = 8;
+
 function calcSpriteScale() {
     if (!spriteData) return 1.0;
     var frameH = spriteData.sourceH;
@@ -107,6 +115,28 @@ function processSpriteSheet(img) {
     return { img: img, frames: frames, sourceH: maxH };
 }
 
+function loadJumpSprite() {
+    return new Promise(function(resolve, reject) {
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() {
+            var sw = img.naturalWidth || img.width;
+            var sh = img.naturalHeight || img.height;
+            var fw = sw / 4;
+            jumpSpriteData = { img: img, frameWidth: fw, frameHeight: sh, frames: 4 };
+            jumpSpriteReady = true;
+            console.log('[JumpSprite] Lompat sprite loaded:', fw + 'x' + sh);
+            resolve();
+        };
+        img.onerror = function() {
+            console.warn('[JumpSprite] Gagal load sprite lompat');
+            resolve(); // tetap lanjut meskipun gagal
+        };
+        img.src = JUMP_SPRITE_URL;
+    });
+}
+
+// ============================================
 // ============================================
 // LOAD SPRITE SHEET + CLOUD
 // ============================================
@@ -154,8 +184,11 @@ function loadSpriteSheet() {
         };
         img.src = SPRITE_URL;
 
+        // Load sprite lompat juga
+        var jumpPromise = loadJumpSprite();
+
         if (typeof loadCloudImage === 'function') {
-            loadCloudImage().then(function() {
+            Promise.all([loadCloudImage(), jumpPromise]).then(function() {
                 loadFill.style.width = '80%';
                 loadText.textContent = 'Memuat awan...';
                 checkComplete();
@@ -163,7 +196,7 @@ function loadSpriteSheet() {
                 checkComplete();
             });
         } else {
-            checkComplete();
+            jumpPromise.then(checkComplete).catch(checkComplete);
         }
     });
 }
@@ -855,26 +888,75 @@ function drawPlayer() {
             if (isMoving) {
                 spriteAnimTimer += SPRITE_FPS / 60;
                 if (spriteAnimTimer >= 1) { spriteAnimTimer -= 1; currentSpriteFrame = (currentSpriteFrame + 1) % 4; }
-            } else if (isInAir) { currentSpriteFrame = 2; spriteAnimTimer = 0; }
-            else { currentSpriteFrame = 0; spriteAnimTimer = 0; }
+            } else if (isInAir) { 
+                // Gunakan sprite lompat 4-frame dengan state machine
+                if (jumpSpriteReady && jumpSpriteData) {
+                    jumpAnimTimer += JUMP_SPRITE_FPS / 60;
+                    if (jumpAnimTimer >= 1) { 
+                        jumpAnimTimer -= 1;
+                        // State machine: 0=ready→1=takeoff→2=air→3=landing
+                        if (p.vy < -2) {
+                            // Naik — frame 0→1
+                            if (currentJumpFrame < 1) currentJumpFrame++;
+                        } else if (p.vy > 2) {
+                            // Turun — frame 2→3
+                            if (currentJumpFrame < 2) currentJumpFrame = 2;
+                            else if (currentJumpFrame < 3) currentJumpFrame++;
+                        } else {
+                            // Puncak — hold frame 2
+                            currentJumpFrame = 2;
+                        }
+                    }
+                }
+            }
+            else { currentSpriteFrame = 0; spriteAnimTimer = 0; jumpAnimTimer = 0; currentJumpFrame = 0; }
 
-            var fr = spriteData.frames[currentSpriteFrame];
-            if (fr) {
-                var sc = SPRITE_SCALE;
-                var drawW = fr.w * sc, drawH = fr.h * sc;
-                var drawX = -fr.ox * sc, drawY = (PH / 2) - fr.oy * sc;
+            // Render sprite lompat saat di udara
+            if (isInAir && jumpSpriteReady && jumpSpriteData) {
+                var jsc = SPRITE_SCALE * 0.9;
+                var jw = jumpSpriteData.frameWidth * jsc;
+                var jh = jumpSpriteData.frameHeight * jsc;
+                var jx = -jw / 2;
+                var jy = (PH / 2) - jh + 8;
 
                 X.save();
-                if (p.facing === -1) { X.scale(-1, 1); drawX = -drawX - drawW; }
+                if (p.facing === -1) { X.scale(-1, 1); jx = -jx - jw; }
 
+                // Bayangan
                 X.save();
-                X.globalAlpha = 0.2;
-                X.beginPath(); X.ellipse(0, PH / 2 + 2, drawW * 0.35, 4, 0, 0, 6.28);
+                X.globalAlpha = 0.15;
+                X.beginPath(); X.ellipse(0, PH / 2 + 2, jw * 0.3, 4, 0, 0, 6.28);
                 X.fillStyle = '#000'; X.fill();
                 X.restore();
 
-                X.drawImage(spriteData.img, fr.x, fr.y, fr.w, fr.h, drawX, drawY, drawW, drawH);
+                X.drawImage(
+                    jumpSpriteData.img,
+                    currentJumpFrame * jumpSpriteData.frameWidth, 0,
+                    jumpSpriteData.frameWidth, jumpSpriteData.frameHeight,
+                    jx, jy, jw, jh
+                );
                 X.restore();
+            } 
+            // Render sprite lari saat di tanah
+            else {
+                var fr = spriteData.frames[currentSpriteFrame];
+                if (fr) {
+                    var sc = SPRITE_SCALE;
+                    var drawW = fr.w * sc, drawH = fr.h * sc;
+                    var drawX = -fr.ox * sc, drawY = (PH / 2) - fr.oy * sc;
+
+                    X.save();
+                    if (p.facing === -1) { X.scale(-1, 1); drawX = -drawX - drawW; }
+
+                    X.save();
+                    X.globalAlpha = 0.2;
+                    X.beginPath(); X.ellipse(0, PH / 2 + 2, drawW * 0.35, 4, 0, 0, 6.28);
+                    X.fillStyle = '#000'; X.fill();
+                    X.restore();
+
+                    X.drawImage(spriteData.img, fr.x, fr.y, fr.w, fr.h, drawX, drawY, drawW, drawH);
+                    X.restore();
+                }
             }
         } else {
             // FALLBACK
