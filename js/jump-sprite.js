@@ -1,170 +1,129 @@
 /* ========================================
-   SUN WUKONG JUMP EFFECTS
-   File: js/jump-sprite.js
-   Hanya efek visual: dust, trail, landing ring, screen shake
-   Render sprite lompat sudah di-handle oleh game.js
+   SUN WUKONG JUMP SPRITE SYSTEM
+   File: css/jump-sprite.css
+   Pisahkan agar mudah di-maintain & dikustomisasi
    ======================================== */
 
-(function() {
-  'use strict';
+/* ---------- VARIABLES ---------- */
+:root{
+  --jump-scale: 1.6;
+  --jump-anim-speed: 6;
+  --jump-glow: rgba(255, 215, 0, 0.4);
+  --jump-shadow: rgba(0, 0, 0, 0.25);
+}
 
-  const CONFIG = {
-    effectsEnabled: true,
-    debug: false
-  };
+/* ---------- SPRITE SHEET ---------- */
+.sprite-sheet{
+  display: none !important;
+  pointer-events: none;
+  user-select: none;
+}
 
-  class JumpEffectsSystem {
-    constructor() {
-      this.fxContainer = document.getElementById('jumpEffects');
-      this.body = document.body;
-      this.player = null;
-      this.playerFound = false;
+/* Container untuk sprite (auto-generated via JS) */
+.jump-sprite-container{
+  position: absolute;
+  pointer-events: none;
+  z-index: 12;
+  will-change: transform, opacity;
+}
 
-      this.prevOnGround = true;
-      this.prevVy = 0;
-      this.lastTrailTime = 0;
+/* ---------- LANDING EFFECT ---------- */
+.landing-ring{
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--jump-glow);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+  pointer-events: none;
+  z-index: 11;
+}
 
-      this.init();
-    }
+.landing-ring.animate{
+  animation: landingRipple 0.5s ease-out forwards;
+}
 
-    init() {
-      this.findPlayerLoop();
-      this.hookGameLoop();
-      if (CONFIG.debug) console.log('[JumpEffects] Initialized');
-    }
+@keyframes landingRipple{
+  0%   { opacity: 0.8; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 0;   transform: translate(-50%, -50%) scale(2.0); }
+}
 
-    findPlayerLoop() {
-      const scan = () => {
-        if (this.playerFound) return;
-        const names = ['player', 'hero', 'wukong', 'p', 'monkey'];
-        for (let n of names) {
-          if (window[n] && typeof window[n] === 'object' && window[n].x !== undefined) {
-            this.player = window[n];
-            this.playerFound = true;
-            if (CONFIG.debug) console.log('[JumpEffects] Player found:', n);
-            return;
-          }
-        }
-      };
-      scan();
-      setTimeout(scan, 600);
-      setTimeout(scan, 2000);
-    }
+/* ---------- DUST EFFECT (saat takeoff) ---------- */
+.jump-dust{
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: rgba(200, 180, 140, 0.6);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 11;
+}
 
-    getPlayerState() {
-      if (!this.player) return null;
-      const p = this.player;
-      return {
-        x: p.x || 0,
-        y: p.y || 0,
-        w: p.width || p.w || 50,
-        h: p.height || p.h || 70,
-        vy: p.vy || p.velocityY || 0,
-        onGround: p.onGround !== undefined ? p.onGround : false,
-        facing: p.facing || (p.vx < 0 ? -1 : 1)
-      };
-    }
+.jump-dust.animate{
+  animation: dustPoof 0.4s ease-out forwards;
+}
 
-    /* ---------- EFEK ---------- */
-    spawnDust(x, y) {
-      if (!CONFIG.effectsEnabled || !this.fxContainer) return;
-      for (let i = 0; i < 6; i++) {
-        const dust = document.createElement('div');
-        dust.className = 'jump-dust';
-        const angle = (Math.PI * 2 * i) / 6;
-        const dist = 15 + Math.random() * 25;
-        dust.style.setProperty('--dx', (Math.cos(angle) * dist).toFixed(1) + 'px');
-        dust.style.setProperty('--dy', (Math.sin(angle) * dist * 0.4).toFixed(1) + 'px');
-        dust.style.left = (x + Math.random() * 16 - 8) + 'px';
-        dust.style.top = (y + Math.random() * 10) + 'px';
-        const sz = 5 + Math.random() * 7;
-        dust.style.width = sz + 'px';
-        dust.style.height = sz + 'px';
-        this.fxContainer.appendChild(dust);
-        requestAnimationFrame(() => dust.classList.add('animate'));
-        setTimeout(() => { if (dust.parentNode) dust.remove(); }, 500);
-      }
-    }
+@keyframes dustPoof{
+  0%   { opacity: 0.8; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0;   transform: translate(var(--dx), var(--dy)) scale(0); }
+}
 
-    spawnLandingRing(x, y) {
-      if (!CONFIG.effectsEnabled || !this.fxContainer) return;
-      const ring = document.createElement('div');
-      ring.className = 'landing-ring';
-      ring.style.left = x + 'px';
-      ring.style.top = y + 'px';
-      ring.style.width = '70px';
-      ring.style.height = '22px';
-      this.fxContainer.appendChild(ring);
-      requestAnimationFrame(() => ring.classList.add('animate'));
-      setTimeout(() => { if (ring.parentNode) ring.remove(); }, 600);
-    }
+/* ---------- AIR TRAIL (jejak saat di udara) ---------- */
+.air-trail{
+  position: absolute;
+  width: 20px;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(255,215,0,0.3), transparent);
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 10;
+}
 
-    spawnAirTrail(x, y, facing) {
-      if (!CONFIG.effectsEnabled || !this.fxContainer) return;
-      const now = performance.now();
-      if (now - this.lastTrailTime < 90) return;
-      this.lastTrailTime = now;
-      const trail = document.createElement('div');
-      trail.className = 'air-trail';
-      trail.style.left = (x + (facing === -1 ? 25 : -5)) + 'px';
-      trail.style.top = (y + 30) + 'px';
-      trail.style.transform = facing === -1 ? 'scaleX(-1)' : 'scaleX(1)';
-      this.fxContainer.appendChild(trail);
-      requestAnimationFrame(() => trail.classList.add('show'));
-      setTimeout(() => { if (trail.parentNode) trail.remove(); }, 400);
-    }
+.air-trail.show{
+  animation: trailFade 0.3s ease-out forwards;
+}
 
-    screenShake() {
-      if (!CONFIG.effectsEnabled) return;
-      this.body.classList.remove('screen-shake');
-      void this.body.offsetWidth;
-      this.body.classList.add('screen-shake');
-      setTimeout(() => this.body.classList.remove('screen-shake'), 260);
-    }
+@keyframes trailFade{
+  0%   { opacity: 0.5; transform: scaleX(1); }
+  100% { opacity: 0;   transform: scaleX(0.2) translateX(-10px); }
+}
 
-    /* ---------- LOOP ---------- */
-    update() {
-      const ps = this.getPlayerState();
-      if (!ps) return;
+/* ---------- SCREEN SHAKE (saat landing keras) ---------- */
+.screen-shake{
+  animation: shake 0.25s ease-in-out;
+}
 
-      const centerX = ps.x + ps.w / 2;
-      const bottomY = ps.y + ps.h;
+@keyframes shake{
+  0%, 100% { transform: translate(0, 0); }
+  20%      { transform: translate(-3px, 2px); }
+  40%      { transform: translate(3px, -2px); }
+  60%      { transform: translate(-2px, 1px); }
+  80%      { transform: translate(2px, -1px); }
+}
 
-      // Takeoff effect
-      if (!ps.onGround && this.prevOnGround && ps.vy < -2) {
-        this.spawnDust(centerX, bottomY);
-      }
+/* ---------- GLOW PULSE (saat charge lompat) ---------- */
+.jump-charge-glow{
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,215,0,0.2) 0%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 11;
+}
 
-      // Air trail
-      if (!ps.onGround && Math.abs(ps.vy) > 1) {
-        this.spawnAirTrail(ps.x, ps.y, ps.facing);
-      }
+.jump-charge-glow.active{
+  animation: chargePulse 0.6s ease-in-out infinite alternate;
+}
 
-      // Landing effect
-      if (ps.onGround && !this.prevOnGround && this.prevVy > 3) {
-        this.spawnLandingRing(centerX, bottomY);
-        if (this.prevVy > 8) this.screenShake();
-      }
+@keyframes chargePulse{
+  0%   { opacity: 0.3; transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.3); }
+}
 
-      this.prevOnGround = ps.onGround;
-      this.prevVy = ps.vy;
-    }
-
-    hookGameLoop() {
-      const originalRAF = window.requestAnimationFrame;
-      const self = this;
-      window.requestAnimationFrame = function(callback) {
-        return originalRAF.call(window, function(timestamp) {
-          self.update();
-          callback(timestamp);
-        });
-      };
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => new JumpEffectsSystem());
-  } else {
-    new JumpEffectsSystem();
-  }
-})();
+/* ---------- RESPONSIVE SCALE ---------- */
+@media (max-width: 600px){
+  :root{ --jump-scale: 1.3; }
+}
+@media (min-width: 1025px){
+  :root{ --jump-scale: 1.9; }
+}
