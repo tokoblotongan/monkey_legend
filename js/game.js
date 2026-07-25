@@ -373,6 +373,11 @@ document.addEventListener('touchmove', function(e) { if (state === 'play') e.pre
 // TRIGGER GAME OVER
 // ============================================
 function triggerGameOver() {
+    // Guard: jangan trigger 2x
+    if (typeof gameOverTriggered !== 'undefined' && gameOverTriggered) return;
+    gameOverTriggered = true;
+    window.gameOverTriggered = true;
+
     // Hentikan loop jika ada
     if (animationId) {
         cancelAnimationFrame(animationId);
@@ -389,7 +394,10 @@ function triggerGameOver() {
     if (goSt) goSt.innerHTML = 'Skor: <span>' + score + '</span><br>Jarak: <span>' + distance + 'm</span>';
 
     var gameover = document.getElementById('gameover');
-    if (gameover) gameover.classList.add('show');
+    if (gameover) {
+        gameover.classList.add('show');
+        gameover.style.display = 'flex';
+    }
 
     var touchControls = document.getElementById('touchControls');
     if (touchControls) touchControls.classList.remove('show');
@@ -400,6 +408,25 @@ function triggerGameOver() {
     touchState.kame = false; touchState.cloud = false;
     touchState.down = false; touchState.moveX = 0; touchState.moveY = 0;
     mouseState.leftClick = false;
+
+    // Force draw Game Over fallback di canvas (kalau CSS overlay gagal)
+    try {
+        X.clearRect(0, 0, W, H);
+        drawSky();
+        X.fillStyle = 'rgba(0,0,0,0.65)';
+        X.fillRect(0, 0, W, H);
+        X.fillStyle = '#FF4444';
+        X.font = 'bold 52px Fredoka One';
+        X.textAlign = 'center';
+        X.textBaseline = 'middle';
+        X.fillText('TUMBANG!', W/2, H/2 - 40);
+        X.fillStyle = '#FFD700';
+        X.font = 'bold 24px Nunito';
+        X.fillText('Skor: ' + score + '  |  Jarak: ' + distance + 'm', W/2, H/2 + 15);
+        X.fillStyle = 'rgba(255,255,255,0.7)';
+        X.font = '16px Nunito';
+        X.fillText('Tekan ENTER atau klik tombol Coba Lagi', W/2, H/2 + 55);
+    } catch(e) {}
 
     console.log('💀 Game Over - Skor:', score, 'Jarak:', distance);
 }
@@ -431,7 +458,16 @@ function startGame() {
 
     state = 'play';
     window.state = state;
-    document.getElementById('overlay').classList.add('hidden');
+    var overlayEl = document.getElementById('overlay');
+    if (overlayEl) {
+        overlayEl.classList.add('hidden');
+        overlayEl.classList.remove('show');
+    }
+    var gameoverStart = document.getElementById('gameover');
+    if (gameoverStart) {
+        gameoverStart.classList.remove('show');
+        gameoverStart.style.display = 'none';
+    }
     if (isTouchDevice) document.getElementById('touchControls').classList.add('show');
     
     // Mulai loop baru
@@ -464,7 +500,10 @@ function restartGame() {
     window.state = state;
     
     var gameoverEl = document.getElementById('gameover');
-    if (gameoverEl) gameoverEl.classList.remove('show');
+    if (gameoverEl) {
+        gameoverEl.classList.remove('show');
+        gameoverEl.style.display = 'none';
+    }
     
     if (isTouchDevice) {
         var touchControls = document.getElementById('touchControls');
@@ -1035,6 +1074,9 @@ function initGame() {
     window.W = W;
     window.H = H;
     
+    gameOverTriggered = false;
+    window.gameOverTriggered = false;
+
     console.log('✅ initGame() selesai');
 }
 
