@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Monkey Legend — Sun Wukong Adventure</title>
+<!-- CSS -->
+<link rel="stylesheet" href="css/style.css">
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div class="qf" id="qf"></div>
+
+<!-- UI Game -->
+<div id="ui">
+  <div class="panel"><h3>Nyawa</h3><div class="bar-w"><div class="bar-f hp-f" id="hpB" style="width:100%"></div></div></div>
+  <div class="panel" style="text-align:center"><h3>Skor</h3><div class="val g" id="scV">0</div></div>
+  <div class="panel" style="text-align:center"><h3>Jarak</h3><div class="val c" id="dsV">0m</div></div>
+  <div class="panel"><h3>Energi</h3><div class="bar-w"><div class="bar-f en-f" id="enB" style="width:100%"></div></div></div>
+</div>
+
+<!-- Touch Controls -->
+<div id="touchControls">
+  <div id="joystickZone"><div id="joystickBase"></div><div id="joystickThumb"></div></div>
+  <div id="actionButtons">
+    <div class="act-row"><div class="act-btn" id="btnCloud">Awan</div><div class="act-btn" id="btnJump">Lompat</div></div>
+    <div class="act-row"><div class="act-btn" id="btnKame">Kame</div><div class="act-btn" id="btnAtk">Tongkat</div></div>
+    <div class="act-btn" id="btnDown">Turun</div>
+  </div>
+</div>
+
+<!-- Overlay Menu -->
+<div id="overlay">
+  <div id="coverBg"></div>
+  <div id="menuContent">
+    <div class="enter-hint">⚡ Tekan ENTER / Klik Tombol ⚡</div>
+    <button class="btn" id="startBtn">Mulai Petualangan</button>
+    <div class="ctrls">
+<div class="ctrls">
+  <div class="ctrl"><kbd>←</kbd><kbd>→</kbd> Gerak</div>
+  <div class="ctrl"><kbd>↑</kbd> Lompat</div>
+  <div class="ctrl"><kbd>↓</kbd> Turun</div>
+  <div class="ctrl"><kbd>A</kbd> Tongkat</div>
+  <div class="ctrl"><kbd>S</kbd> Awan</div>
+  <div class="ctrl"><kbd>D</kbd> Kamehameha</div>
+</div>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div id="gameover">
+  <h1>Tumbang!</h1>
+  <div class="st" id="goSt"></div>
+  <div class="enter-hint">⚡ Tekan ENTER / Klik Tombol ⚡</div>
+  <button class="btn" id="restartBtn">Coba Lagi</button>
+</div>
+
+<!-- Loading -->
+<div id="loadingBar"><div id="loadingFill"></div></div>
+<div id="loadingText">Memuat karakter...</div>
+
+<!-- ========== JAVASCRIPT ========== -->
+<script src="js/utils.js"></script>
+<script src="js/cloud.js"></script>   <!-- TAMBAHKAN INI -->
+<script src="js/player.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
