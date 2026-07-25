@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Monkey Legend — Sun Wukong Adventure</title>
 
-<!-- CSS Utama (tetap seperti asli) -->
+<!-- CSS Utama -->
 <link rel="stylesheet" href="css/style.css">
-<!-- CSS Efek Lompat (modular, terpisah) -->
+<!-- CSS Efek Lompat (modular) -->
 <link rel="stylesheet" href="css/jump-sprite.css">
 
 <!-- Google Fonts -->
@@ -19,7 +19,7 @@
 <canvas id="c"></canvas>
 <div class="qf" id="qf"></div>
 
-<!-- Container efek visual lompat (dust, trail, ring) -->
+<!-- Container efek visual lompat -->
 <div id="jumpEffects" style="position:fixed;inset:0;pointer-events:none;z-index:11;overflow:hidden"></div>
 
 <!-- UI Game -->
@@ -73,8 +73,9 @@
 <script src="js/utils.js"></script>
 <script src="js/cloud.js"></script>
 <script src="js/player.js"></script>
+<!-- game.js sudah termodifikasi dengan sprite lompat -->
 <script src="js/game.js"></script>
-<!-- Sprite Lompat (modular, terpisah) -->
+<!-- Efek visual lompat (dust, trail, ring) — modular terpisah -->
 <script src="js/jump-sprite.js"></script>
 
 </body>
