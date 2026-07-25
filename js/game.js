@@ -1042,7 +1042,8 @@ function initGame() {
 // GAME LOOP - DENGAN CANVAS CLEAR DI LUAR STATE
 // ============================================
 function loop() {
-    requestAnimationFrame(loop);
+    animationId = requestAnimationFrame(loop);
+    window.animationId = animationId;
 
     // ===== SELALU BERSIHKAN & GAMBAR BACKGROUND =====
     X.clearRect(0, 0, W, H);
