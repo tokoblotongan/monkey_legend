@@ -235,6 +235,33 @@ var state = 'menu',
     score = 0,
     distance = 0,
     frame = 0;
+
+// === MISI HARIAN ===
+var dailyQuests = [
+    { id: 'jump50',  label: 'Lompat 50x',       target: 50,  current: 0, reward: 'peach',      done: false },
+    { id: 'kill10',  label: 'Kalahkan 10 Hantu', target: 10,  current: 0, reward: 'energy',     done: false },
+    { id: 'coin100', label: 'Kumpul 100 Koin',  target: 100, current: 0, reward: 'ticket',     done: false },
+    { id: 'nodmg500',label: '500m Tanpa Damage', target: 500, current: 0, reward: 'shield',     done: false }
+];
+var questDistanceStart = 0;
+var questNoDamage = true;
+
+// === BOSS SYSTEM ===
+var boss = null;
+var bossState = 'idle'; // idle, enter, fight, dead, escape
+var BOSS_SPAWN_DISTANCE = 500;
+var nextBossDistance = BOSS_SPAWN_DISTANCE;
+
+// === PET SYSTEM ===
+var pet = null;
+var PET_FOLLOW_SPEED = 0.12;
+var PET_COLLECT_RADIUS = 80;
+
+// === COMBO SYSTEM ===
+var comboCount = 0;
+var comboTimer = 0;
+var COMBO_MAX_TIME = 180; // frames (~3 detik)
+var comboMultiplier = 1;
 var player, platforms, ghosts, particles, projectiles, kameBlasts;
 var keys = {},
     shake = { x: 0, y: 0, i: 0, t: 0 },
@@ -255,6 +282,10 @@ window.state      = state;
 window.score      = score;
 window.distance   = distance;
 window.frame      = frame;
+window.dailyQuests= dailyQuests;
+window.boss       = boss;
+window.pet        = pet;
+window.comboCount = comboCount;
 window.player     = player;
 window.platforms  = platforms;
 window.ghosts     = ghosts;
@@ -408,6 +439,458 @@ function updateJoystick(clientX, clientY, maxR, jthumb) {
 
 document.addEventListener('touchmove', function(e) { if (state === 'play') e.preventDefault(); }, { passive: false });
 
+
+// === QUEST FUNCTIONS ===
+function updateQuest(type, amount) {
+    for (var i = 0; i < dailyQuests.length; i++) {
+        var q = dailyQuests[i];
+        if (q.done) continue;
+        if (type === 'jump' && q.id === 'jump50') {
+            q.current += amount || 1;
+        } else if (type === 'kill' && q.id === 'kill10') {
+            q.current += amount || 1;
+        } else if (type === 'coin' && q.id === 'coin100') {
+            q.current += amount || 1;
+        }
+        if (q.current >= q.target) {
+            q.current = q.target;
+            q.done = true;
+            giveReward(q.reward);
+            spawnP(player.x, player.y - 40, 12, '#FFD700', 1.5, 1.2);
+            sfxCoin();
+        }
+    }
+    renderQuestUI();
+}
+
+function giveReward(type) {
+    if (type === 'peach') {
+        player.hp = Math.min(player.maxHp, player.hp + 25);
+        showFloatingText('+25 HP', player.x, player.y - 50, '#FF4444');
+    } else if (type === 'energy') {
+        player.energy = Math.min(player.maxEnergy, player.energy + 40);
+        showFloatingText('+40 Energy', player.x, player.y - 50, '#00E5FF');
+    } else if (type === 'ticket') {
+        player.inv = Math.max(player.inv, 300);
+        showFloatingText('SHIELD 5s!', player.x, player.y - 50, '#FFD700');
+    } else if (type === 'shield') {
+        player.inv = Math.max(player.inv, 600);
+        showFloatingText('SHIELD 10s!', player.x, player.y - 50, '#FFD700');
+    }
+}
+
+var floatingTexts = [];
+function showFloatingText(text, x, y, color) {
+    floatingTexts.push({ text: text, x: x, y: y, color: color, life: 60, vy: -1.5 });
+}
+
+function renderQuestUI() {
+    var container = document.getElementById('questPanel');
+    if (!container) return;
+    var html = '';
+    for (var i = 0; i < dailyQuests.length; i++) {
+        var q = dailyQuests[i];
+        var pct = Math.min(100, Math.floor(q.current / q.target * 100));
+        var cls = q.done ? 'quest-done' : '';
+        html += '<div class="quest-item ' + cls + '">' +
+                '<div class="quest-label">' + q.label + '</div>' +
+                '<div class="quest-bar"><div class="quest-fill" style="width:' + pct + '%"></div></div>' +
+                '<div class="quest-pct">' + q.current + '/' + q.target + '</div>' +
+                '</div>';
+    }
+    container.innerHTML = html;
+}
+
+// === COMBO FUNCTIONS ===
+function addCombo(amount) {
+    comboCount += (amount || 1);
+    comboTimer = COMBO_MAX_TIME;
+    updateComboMultiplier();
+    renderComboUI();
+}
+
+function resetCombo() {
+    if (comboCount > 5) {
+        showFloatingText('Combo x' + comboCount + ' LOST!', player.x, player.y - 60, '#FF4444');
+    }
+    comboCount = 0;
+    comboTimer = 0;
+    comboMultiplier = 1;
+    renderComboUI();
+}
+
+function updateCombo() {
+    if (comboTimer > 0) {
+        comboTimer--;
+        if (comboTimer <= 0) {
+            resetCombo();
+        }
+    }
+}
+
+function updateComboMultiplier() {
+    if (comboCount >= 30) comboMultiplier = 4;
+    else if (comboCount >= 20) comboMultiplier = 3;
+    else if (comboCount >= 10) comboMultiplier = 2;
+    else comboMultiplier = 1;
+}
+
+function renderComboUI() {
+    var el = document.getElementById('comboDisplay');
+    if (!el) return;
+    if (comboCount < 2) {
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = 'block';
+    var labels = ['', '', 'GOOD!', 'GREAT!', 'AWESOME!', 'SUPER!', 'AMAZING!', 'LEGENDARY!'];
+    var label = labels[Math.min(comboMultiplier, labels.length - 1)] || '';
+    var colors = ['', '#FFF', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800', '#FF5722'];
+    var color = colors[Math.min(comboMultiplier, colors.length - 1)] || '#FFF';
+    el.innerHTML = '<div class="combo-count" style="color:' + color + '">x' + comboCount + '</div>' +
+                   '<div class="combo-label" style="color:' + color + '">' + label + '</div>' +
+                   '<div class="combo-bar"><div class="combo-fill" style="width:' + Math.floor(comboTimer/COMBO_MAX_TIME*100) + '%"></div></div>';
+}
+
+// === BOSS FUNCTIONS ===
+function spawnBoss() {
+    bossState = 'enter';
+    var bossType = Math.floor(distance / BOSS_SPAWN_DISTANCE) % 3;
+    var names = ['Bull Demon', 'White Bone', 'Red Boy'];
+    var colors = ['#8B0000', '#E0E0E0', '#FF4500'];
+    var hps = [15, 20, 25];
+    boss = {
+        x: cam.x + W + 100,
+        y: H - 150,
+        vx: -2,
+        vy: 0,
+        size: 70,
+        hp: hps[bossType],
+        maxHp: hps[bossType],
+        type: bossType,
+        name: names[bossType],
+        color: colors[bossType],
+        phase: 0,
+        hitFlash: 0,
+        attackTimer: 0,
+        attacks: []
+    };
+    showFloatingText('BOSS: ' + boss.name + '!', player.x, player.y - 80, '#FF4444');
+    sfxQuake();
+}
+
+function updateBoss() {
+    if (!boss) return;
+    boss.phase += 0.03;
+
+    if (bossState === 'enter') {
+        boss.x += boss.vx;
+        if (boss.x < cam.x + W * 0.65) {
+            bossState = 'fight';
+            boss.vx = 0;
+        }
+    } else if (bossState === 'fight') {
+        // Boss floating
+        boss.y += Math.sin(boss.phase * 2) * 1.5;
+
+        // Attack pattern
+        boss.attackTimer++;
+        if (boss.attackTimer > 120) {
+            boss.attackTimer = 0;
+            // Fire projectile
+            var dir = boss.x > player.x ? -1 : 1;
+            boss.attacks.push({
+                x: boss.x, y: boss.y,
+                vx: dir * 5, vy: rnd(-2, 2),
+                size: 12, life: 90
+            });
+        }
+
+        // Check player hit boss
+        if (Math.abs(player.x - boss.x) < boss.size + PW && 
+            Math.abs(player.y - boss.y) < boss.size + PH &&
+            player.vy < -2) {
+            // Player jump on boss head
+            boss.hp -= 3;
+            boss.hitFlash = 10;
+            player.vy = -8;
+            sfxHit();
+            spawnP(boss.x, boss.y - boss.size, 8, '#FFD700', 1.2);
+            addCombo(3);
+        }
+
+        // Check staff hit
+        for (var i = 0; i < projectiles.length; i++) {
+            var p = projectiles[i];
+            if (Math.hypot(p.x - boss.x, p.y - boss.y) < boss.size + p.size) {
+                boss.hp -= 1;
+                boss.hitFlash = 6;
+                p.life = 0;
+                sfxHit();
+                spawnP(boss.x, boss.y, 4, '#FFD700', 0.8);
+            }
+        }
+
+        // Boss attacks hit player
+        for (var i = 0; i < boss.attacks.length; i++) {
+            var a = boss.attacks[i];
+            a.x += a.vx; a.y += a.vy; a.life--;
+            if (Math.hypot(a.x - player.x, a.y - player.y) < a.size + PW * 0.5 && player.inv <= 0) {
+                player.hp -= 15;
+                player.inv = 40;
+                sfxHit();
+                triggerShake(8, 12);
+                resetCombo();
+                questNoDamage = false;
+            }
+        }
+        boss.attacks = boss.attacks.filter(function(a) { return a.life > 0; });
+
+        if (boss.hitFlash > 0) boss.hitFlash--;
+
+        if (boss.hp <= 0) {
+            bossState = 'dead';
+            score += 1000;
+            spawnP(boss.x, boss.y, 25, '#FFD700', 2, 1.5);
+            sfxDie();
+            triggerShake(15, 20);
+            showFloatingText('BOSS DEFEATED! +1000', boss.x, boss.y - 60, '#FFD700');
+            updateQuest('kill', 5);
+            // Spawn reward
+            for (var i = 0; i < 5; i++) {
+                platforms[0].coins.push({
+                    x: boss.x + rnd(-60, 60),
+                    y: boss.y - 40,
+                    collected: false,
+                    bob: rnd(0, 6.28)
+                });
+            }
+            setTimeout(function() {
+                bossState = 'escape';
+            }, 1500);
+        }
+    } else if (bossState === 'escape') {
+        boss.x += 8;
+        boss.y += Math.sin(boss.phase * 3) * 3;
+        if (boss.x > cam.x + W + 200) {
+            boss = null;
+            bossState = 'idle';
+            nextBossDistance += BOSS_SPAWN_DISTANCE;
+        }
+    }
+}
+
+function drawBoss() {
+    if (!boss) return;
+    var sx = boss.x - cam.x, sy = boss.y - cam.y;
+    if (sx < -150 || sx > W + 150) return;
+
+    X.save();
+    X.translate(sx, sy);
+
+    // Shadow
+    X.globalAlpha = 0.15;
+    X.beginPath();
+    X.ellipse(0, boss.size * 0.7, boss.size * 0.6, 10, 0, 0, 6.28);
+    X.fillStyle = '#000'; X.fill();
+    X.globalAlpha = 1;
+
+    // Body
+    var s = boss.size;
+    var g = X.createRadialGradient(0, -s * 0.2, s * 0.2, 0, 0, s);
+    g.addColorStop(0, boss.color);
+    g.addColorStop(0.7, darkenColor(boss.color, 0.7));
+    g.addColorStop(1, 'rgba(0,0,0,0.3)');
+    X.beginPath();
+    X.arc(0, 0, s, 0, 6.28);
+    X.fillStyle = g; X.fill();
+
+    // Eyes
+    var eyeOff = Math.sin(boss.phase * 3) * 3;
+    X.fillStyle = '#FFF';
+    X.beginPath(); X.arc(-s * 0.3, -s * 0.15 + eyeOff, s * 0.18, 0, 6.28); X.fill();
+    X.beginPath(); X.arc(s * 0.3, -s * 0.15 + eyeOff, s * 0.18, 0, 6.28); X.fill();
+    X.fillStyle = '#000';
+    X.beginPath(); X.arc(-s * 0.3 + Math.sin(boss.phase) * 3, -s * 0.15 + eyeOff, s * 0.08, 0, 6.28); X.fill();
+    X.beginPath(); X.arc(s * 0.3 + Math.sin(boss.phase) * 3, -s * 0.15 + eyeOff, s * 0.08, 0, 6.28); X.fill();
+
+    // Horns/Features based on type
+    if (boss.type === 0) {
+        // Bull horns
+        X.strokeStyle = '#444'; X.lineWidth = 6;
+        X.beginPath(); X.moveTo(-s * 0.5, -s * 0.5); X.quadraticCurveTo(-s * 0.9, -s * 1.1, -s * 0.3, -s * 0.9); X.stroke();
+        X.beginPath(); X.moveTo(s * 0.5, -s * 0.5); X.quadraticCurveTo(s * 0.9, -s * 1.1, s * 0.3, -s * 0.9); X.stroke();
+    } else if (boss.type === 1) {
+        // Bone spikes
+        X.fillStyle = '#CCC';
+        for (var i = -2; i <= 2; i++) {
+            X.beginPath();
+            X.moveTo(i * s * 0.25, -s * 0.8);
+            X.lineTo(i * s * 0.25 - 4, -s * 1.1);
+            X.lineTo(i * s * 0.25 + 4, -s * 1.1);
+            X.closePath(); X.fill();
+        }
+    } else {
+        // Fire crown
+        X.fillStyle = '#FF6600';
+        for (var i = -3; i <= 3; i++) {
+            var fh = s * 0.3 + Math.sin(boss.phase * 5 + i) * s * 0.15;
+            X.fillRect(i * s * 0.18 - 3, -s * 0.7 - fh, 6, fh);
+        }
+    }
+
+    // Hit flash
+    if (boss.hitFlash > 0) {
+        X.globalAlpha = boss.hitFlash / 10 * 0.5;
+        X.fillStyle = '#FFF';
+        X.beginPath(); X.arc(0, 0, s * 1.1, 0, 6.28); X.fill();
+        X.globalAlpha = 1;
+    }
+
+    // HP Bar
+    X.fillStyle = 'rgba(0,0,0,0.6)';
+    X.fillRect(-s * 0.7, -s - 18, s * 1.4, 10);
+    X.fillStyle = '#FF4444';
+    X.fillRect(-s * 0.7, -s - 18, s * 1.4 * (boss.hp / boss.maxHp), 10);
+    X.strokeStyle = '#FFF'; X.lineWidth = 1;
+    X.strokeRect(-s * 0.7, -s - 18, s * 1.4, 10);
+
+    X.restore();
+
+    // Boss attacks
+    for (var i = 0; i < boss.attacks.length; i++) {
+        var a = boss.attacks[i];
+        var ax = a.x - cam.x, ay = a.y - cam.y;
+        X.beginPath(); X.arc(ax, ay, a.size, 0, 6.28);
+        var ag = X.createRadialGradient(ax, ay, 0, ax, ay, a.size);
+        ag.addColorStop(0, '#FFF'); ag.addColorStop(0.5, '#FF4444'); ag.addColorStop(1, 'rgba(255,0,0,0)');
+        X.fillStyle = ag; X.fill();
+    }
+}
+
+function darkenColor(hex, factor) {
+    // Simple hex darkener
+    var r = parseInt(hex.slice(1,3), 16) * factor;
+    var g = parseInt(hex.slice(3,5), 16) * factor;
+    var b = parseInt(hex.slice(5,7), 16) * factor;
+    return 'rgb(' + Math.floor(r) + ',' + Math.floor(g) + ',' + Math.floor(b) + ')';
+}
+
+// === PET FUNCTIONS ===
+function spawnPet() {
+    if (pet) return;
+    pet = {
+        x: player.x - 40,
+        y: player.y,
+        vx: 0, vy: 0,
+        size: 18,
+        frame: 0,
+        animTimer: 0
+    };
+    showFloatingText('Pet Monyet Bergabung!', player.x, player.y - 60, '#8BC34A');
+}
+
+function updatePet() {
+    if (!pet) return;
+
+    // Follow player with delay
+    var targetX = player.x - 35 * player.facing - 25;
+    var targetY = player.y + 5;
+    pet.vx += (targetX - pet.x) * PET_FOLLOW_SPEED;
+    pet.vy += (targetY - pet.y) * PET_FOLLOW_SPEED;
+    pet.vx *= 0.85;
+    pet.vy *= 0.85;
+    pet.x += pet.vx;
+    pet.y += pet.vy;
+
+    // Auto collect coins
+    for (var i = 0; i < platforms.length; i++) {
+        var pl = platforms[i];
+        for (var j = 0; j < pl.coins.length; j++) {
+            var c = pl.coins[j];
+            if (!c.collected && Math.hypot(pet.x - c.x, pet.y - c.y) < PET_COLLECT_RADIUS) {
+                c.collected = true;
+                score += 50 * comboMultiplier;
+                sfxCoin();
+                spawnP(c.x, c.y, 3, '#FFD700', 0.6, 0.5);
+                addCombo(1);
+                updateQuest('coin', 1);
+            }
+        }
+    }
+
+    // Animation
+    pet.animTimer++;
+    if (pet.animTimer > 8) {
+        pet.animTimer = 0;
+        pet.frame = (pet.frame + 1) % 2;
+    }
+}
+
+function drawPet() {
+    if (!pet) return;
+    var sx = pet.x - cam.x, sy = pet.y - cam.y;
+    if (sx < -50 || sx > W + 50) return;
+
+    X.save();
+    X.translate(sx, sy);
+
+    var s = pet.size;
+    var bounce = Math.sin(frame * 0.15) * 3;
+
+    // Body
+    X.fillStyle = '#8B4513';
+    X.beginPath(); X.ellipse(0, bounce, s, s * 0.9, 0, 0, 6.28); X.fill();
+
+    // Head
+    X.fillStyle = '#A0522D';
+    X.beginPath(); X.arc(0, -s * 0.6 + bounce, s * 0.7, 0, 6.28); X.fill();
+
+    // Ears
+    X.fillStyle = '#8B4513';
+    X.beginPath(); X.ellipse(-s * 0.5, -s * 0.9 + bounce, s * 0.25, s * 0.35, -0.3, 0, 6.28); X.fill();
+    X.beginPath(); X.ellipse(s * 0.5, -s * 0.9 + bounce, s * 0.25, s * 0.35, 0.3, 0, 6.28); X.fill();
+
+    // Eyes
+    X.fillStyle = '#FFF';
+    X.beginPath(); X.arc(-s * 0.2, -s * 0.65 + bounce, s * 0.18, 0, 6.28); X.fill();
+    X.beginPath(); X.arc(s * 0.2, -s * 0.65 + bounce, s * 0.18, 0, 6.28); X.fill();
+    X.fillStyle = '#000';
+    X.beginPath(); X.arc(-s * 0.15, -s * 0.65 + bounce, s * 0.08, 0, 6.28); X.fill();
+    X.beginPath(); X.arc(s * 0.25, -s * 0.65 + bounce, s * 0.08, 0, 6.28); X.fill();
+
+    // Tail
+    X.strokeStyle = '#8B4513'; X.lineWidth = 3;
+    X.beginPath();
+    X.moveTo(s * 0.6, bounce);
+    X.quadraticCurveTo(s * 1.2, -s * 0.5 + bounce + Math.sin(frame * 0.2) * 5, s * 0.9, -s * 0.8 + bounce);
+    X.stroke();
+
+    // Collect radius indicator (subtle)
+    X.globalAlpha = 0.06;
+    X.beginPath(); X.arc(0, 0, PET_COLLECT_RADIUS, 0, 6.28);
+    X.fillStyle = '#FFD700'; X.fill();
+    X.globalAlpha = 1;
+
+    X.restore();
+}
+
+function drawFloatingTexts() {
+    for (var i = floatingTexts.length - 1; i >= 0; i--) {
+        var ft = floatingTexts[i];
+        ft.y += ft.vy;
+        ft.life--;
+        var a = ft.life / 60;
+        X.globalAlpha = a;
+        X.fillStyle = ft.color;
+        X.font = 'bold 16px Fredoka One';
+        X.textAlign = 'center';
+        X.fillText(ft.text, ft.x - cam.x, ft.y - cam.y);
+        X.globalAlpha = 1;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+    }
+}
+
 // ============================================
 // TRIGGER GAME OVER
 // ============================================
@@ -447,6 +930,13 @@ function triggerGameOver() {
     touchState.kame = false; touchState.cloud = false;
     touchState.down = false; touchState.moveX = 0; touchState.moveY = 0;
     mouseState.leftClick = false;
+
+    // Reset combo & quest tracking
+    comboCount = 0;
+    comboTimer = 0;
+    comboMultiplier = 1;
+    questNoDamage = false;
+    renderComboUI();
 
     // Canvas fallback dihapus — hanya pakai CSS overlay #gameover
 
@@ -604,6 +1094,8 @@ function updateGhost(g) {
         player.hp -= 12; player.inv = 50;
         sfxHit(); triggerShake(10, 18);
         spawnP(player.x, player.y, 8, '#FF4444', 1.2);
+        resetCombo();
+        questNoDamage = false;
     }
 }
 
@@ -773,7 +1265,7 @@ function updatePlayer() {
 
     if (inp.up && !p._jumpHeld) {
         if (p.onCloud) { p.onCloud = false; p.cloudTimer = 0; p.vy = JUMP * 0.8; p.jumps = 1; }
-        else if (p.jumps > 0) { p.vy = JUMP; p.jumps--; p.onGround = false; sfxJump(); spawnP(p.x, p.y + PH / 2, 4, '#FFD700', 0.5, 0.5); }
+        else if (p.jumps > 0) { p.vy = JUMP; p.jumps--; p.onGround = false; sfxJump(); spawnP(p.x, p.y + PH / 2, 4, '#FFD700', 0.5, 0.5); updateQuest('jump'); }
         p._jumpHeld = true;
     }
     if (!inp.up) p._jumpHeld = false;
@@ -833,7 +1325,12 @@ function updatePlayer() {
         for (var j = 0; j < pl.coins.length; j++) {
             var c = pl.coins[j];
             if (!c.collected && Math.hypot(p.x - c.x, p.y - c.y) < 24) {
-                c.collected = true; score += 50; sfxCoin(); spawnP(c.x, c.y, 5, '#FFD700', 0.8, 0.6);
+                c.collected = true;
+                score += 50 * comboMultiplier;
+                sfxCoin();
+                spawnP(c.x, c.y, 5, '#FFD700', 0.8, 0.6);
+                addCombo(1);
+                updateQuest('coin', 1);
             }
         }
     }
@@ -1113,6 +1610,26 @@ function initGame() {
     spriteAnimTimer = 0;
     currentSpriteFrame = 0;
 
+    // Reset quest & combo
+    for (var i = 0; i < dailyQuests.length; i++) {
+        dailyQuests[i].current = 0;
+        dailyQuests[i].done = false;
+    }
+    questDistanceStart = 0;
+    questNoDamage = true;
+    comboCount = 0;
+    comboTimer = 0;
+    comboMultiplier = 1;
+    floatingTexts = [];
+
+    // Reset boss
+    boss = null;
+    bossState = 'idle';
+    nextBossDistance = BOSS_SPAWN_DISTANCE;
+
+    // Spawn pet
+    spawnPet();
+
     platforms.push(makePlat(-100, H - 35, 600, 'ground'));
     genX = 500;
     for (var i = 0; i < 3; i++) generateChunk(genX);
@@ -1181,23 +1698,61 @@ function loop() {
         return;
     }
 
-    updatePlayer();
+    // Update combo timer
+    updateCombo();
 
-    var targetCX = player.x - W * 0.35;
-    cam.x += (targetCX - cam.x) * 0.08;
+    // Update quest no-damage distance
+    if (questNoDamage) {
+        var distNoDmg = distance - questDistanceStart;
+        dailyQuests[3].current = Math.floor(distNoDmg);
+        if (dailyQuests[3].current >= dailyQuests[3].target && !dailyQuests[3].done) {
+            dailyQuests[3].done = true;
+            giveReward('shield');
+            renderQuestUI();
+        }
+    }
+
+    updatePlayer();
+    updatePet();
+
+    // Boss fight: stop scroll, lock camera
+    if (bossState === 'fight' || bossState === 'enter') {
+        // Camera tetap, player tidak bisa lari terlalu jauh
+        if (player.x < cam.x + 50) player.x = cam.x + 50;
+        if (player.x > cam.x + W - 50) player.x = cam.x + W - 50;
+    } else {
+        var targetCX = player.x - W * 0.35;
+        cam.x += (targetCX - cam.x) * 0.08;
+    }
     distance = Math.max(distance, Math.floor(player.x / 10));
     score = Math.max(score, distance);
 
-    if (player.x > genX - W * 2) generateChunk(genX);
+    // Check boss spawn
+    if (!boss && bossState === 'idle' && distance >= nextBossDistance) {
+        spawnBoss();
+    }
+
+    // Update boss
+    updateBoss();
+
+    if (bossState !== 'fight' && bossState !== 'enter' && player.x > genX - W * 2) generateChunk(genX);
     platforms = platforms.filter(function(p) { return p.x + p.w > cam.x - 300; });
 
     ghostTimer++;
     var spawnRate = Math.max(100, 380 - distance * 0.25);
-    if (ghostTimer > spawnRate) { ghostTimer = 0; spawnGhost(); }
+    if (bossState !== 'fight' && bossState !== 'enter' && ghostTimer > spawnRate) { ghostTimer = 0; spawnGhost(); }
 
     for (var i = 0; i < ghosts.length; i++) updateGhost(ghosts[i]);
     ghosts = ghosts.filter(function(g) {
-        if (g.hp <= 0) { score += 200; spawnP(g.x, g.y, 18, '#B040FF', 1.4, 1.1); sfxHit(); triggerShake(5, 10); return false; }
+        if (g.hp <= 0) {
+            score += 200 * comboMultiplier;
+            spawnP(g.x, g.y, 18, '#B040FF', 1.4, 1.1);
+            sfxHit();
+            triggerShake(5, 10);
+            addCombo(2);
+            updateQuest('kill');
+            return false;
+        }
         return Math.abs(g.x - cam.x) < W + 200;
     });
 
@@ -1239,7 +1794,10 @@ function loop() {
         for (var i = 0; i < kameBlasts.length; i++) drawKame(kameBlasts[i]);
         for (var i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
         for (var i = 0; i < ghosts.length; i++) drawGhost(ghosts[i]);
+        drawBoss();
         drawPlayer();
+        drawPet();
+        drawFloatingTexts();
         for (var i = 0; i < particles.length; i++) {
             var p = particles[i], a = p.life / p.ml;
             X.globalAlpha = a; X.fillStyle = p.color;
@@ -1280,6 +1838,10 @@ function loop() {
     window.cam = cam;
     window.quakeCD = quakeCD;
     window.ghostTimer = ghostTimer;
+    window.boss = boss;
+    window.pet = pet;
+    window.comboCount = comboCount;
+    window.dailyQuests = dailyQuests;
 }
 
 // === INIT ===
