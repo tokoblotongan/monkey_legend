@@ -896,14 +896,14 @@ function drawPlayer() {
 
             // Render sprite lompat saat di udara
             if (isInAir && jumpSpriteReady && jumpSpriteData) {
-                // Hitung scale agar tinggi sprite lompat SAMA dengan sprite lari
-                var refFrame = spriteData.frames[0];
-                var refH = refFrame.h * SPRITE_SCALE;  // tinggi render sprite lari
-                var jsc = refH / jumpSpriteData.frameHeight;  // scale agar tinggi sama
+                // Hitung scale agar tinggi sprite lompat SAMA PERSIS dengan sprite lari
+                // Tinggi render sprite lari = sourceH * SPRITE_SCALE
+                var targetPlayerH = spriteData.sourceH * SPRITE_SCALE;
+                var jsc = targetPlayerH / jumpSpriteData.frameHeight;
                 var jw = jumpSpriteData.frameWidth * jsc;
-                var jh = refH;  // pastikan tinggi sama persis
+                var jh = targetPlayerH;
                 var jx = -jw / 2;
-                var jy = (PH / 2) - jh + (refFrame.oy * SPRITE_SCALE - jh);
+                var jy = (PH / 2) - jh;
 
                 X.save();
                 if (p.facing === -1) { X.scale(-1, 1); jx = -jx - jw; }
