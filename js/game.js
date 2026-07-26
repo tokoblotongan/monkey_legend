@@ -840,11 +840,11 @@ function updatePet() {
 
     if (petState === 'transforming') {
         petTransformTimer--;
-        pet.transformScale = 1 + (1 - petTransformTimer / 60) * 4; // grow to 5x
+        pet.transformScale = 1 + (1 - petTransformTimer / 60) * 1; // grow to 2x
         if (petTransformTimer <= 0) {
             petState = 'kingkong';
             petTransformTimer = PET_KINGKONG_DURATION;
-            pet.transformScale = 5;
+            pet.transformScale = 2;
             pet.punchTimer = 0;
         }
         // Still follow player during transform
@@ -860,7 +860,7 @@ function updatePet() {
         pet.punchTimer++;
 
         // King Kong follows player at 3-4 steps distance (~140px)
-        var targetX = player.x - (140 * player.facing);
+        var targetX = player.x - (KK.followDist * player.facing);
         var targetY = player.y;
         pet.x += (targetX - pet.x) * 0.18;
         pet.y += (targetY - pet.y) * 0.18;
@@ -892,7 +892,7 @@ function updatePet() {
 
     if (petState === 'cooldown') {
         petTransformTimer--;
-        pet.transformScale = 1 + (petTransformTimer / PET_COOLDOWN) * 0.5; // shrink back
+        pet.transformScale = 1 + (petTransformTimer / PET_COOLDOWN) * 1; // shrink back to 2x then 1x
         if (petTransformTimer <= 0) {
             petState = 'normal';
             pet.transformScale = 1;
