@@ -123,14 +123,49 @@ function loadJumpSprite() {
             var sw = img.naturalWidth || img.width;
             var sh = img.naturalHeight || img.height;
             var fw = sw / 4;
-            jumpSpriteData = { img: img, frameWidth: fw, frameHeight: sh, frames: 4 };
+
+            // Hitung max tinggi karakter per frame (trim transparent pixels)
+            var tc = document.createElement('canvas');
+            tc.width = sw;
+            tc.height = sh;
+            var tx = tc.getContext('2d');
+            tx.drawImage(img, 0, 0);
+            var imgData = tx.getImageData(0, 0, sw, sh);
+            var pixels = imgData.data;
+
+            var maxContentH = 0;
+            for (var f = 0; f < 4; f++) {
+                var fx = Math.floor(f * fw);
+                var fx2 = Math.floor((f + 1) * fw);
+                var fminY = sh, fmaxY = 0;
+                for (var px = fx; px < fx2; px++) {
+                    for (var py = 0; py < sh; py++) {
+                        var idx = (py * sw + px) * 4;
+                        if (pixels[idx + 3] > 20) {
+                            if (py < fminY) fminY = py;
+                            if (py > fmaxY) fmaxY = py;
+                        }
+                    }
+                }
+                var fh = fmaxY - fminY + 1;
+                if (fh > maxContentH) maxContentH = fh;
+            }
+            if (maxContentH < 10) maxContentH = sh; // fallback
+
+            jumpSpriteData = { 
+                img: img, 
+                frameWidth: fw, 
+                frameHeight: sh, 
+                sourceH: maxContentH,
+                frames: 4 
+            };
             jumpSpriteReady = true;
-            console.log('[JumpSprite] Lompat sprite loaded:', fw + 'x' + sh);
+            console.log('[JumpSprite] Lompat sprite loaded:', fw + 'x' + sh, 'contentH:', maxContentH);
             resolve();
         };
         img.onerror = function() {
             console.warn('[JumpSprite] Gagal load sprite lompat');
-            resolve(); // tetap lanjut meskipun gagal
+            resolve();
         };
         img.src = JUMP_SPRITE_URL;
     });
@@ -896,10 +931,11 @@ function drawPlayer() {
 
             // Render sprite lompat saat di udara
             if (isInAir && jumpSpriteReady && jumpSpriteData) {
-                // Hitung scale agar tinggi sprite lompat SAMA PERSIS dengan sprite lari
-                // Tinggi render sprite lari = sourceH * SPRITE_SCALE
+                // Scale agar tinggi karakter lompat = tinggi karakter lari
+                // spriteData.sourceH = max tinggi karakter lari (after trim)
+                // jumpSpriteData.sourceH = max tinggi karakter lompat (after trim)
                 var targetPlayerH = spriteData.sourceH * SPRITE_SCALE;
-                var jsc = targetPlayerH / jumpSpriteData.frameHeight;
+                var jsc = targetPlayerH / jumpSpriteData.sourceH;
                 var jw = jumpSpriteData.frameWidth * jsc;
                 var jh = targetPlayerH;
                 var jx = -jw / 2;
