@@ -1,7 +1,6 @@
 // ============================================
-// KING KONG SPRITE MODULE
-// Menggunakan: assets/images/Kingkong brutal.png (4 frame)
-// Frame: 0=RightPunch, 1=LeftPunch, 2=ChestBeat1, 3=ChestBeat2
+// KING KONG SPRITE MODULE v2
+// Skala: 2x Sun Wukong | Gerakan: kanan-kiri brutal | Ekspresi: marah
 // ============================================
 
 var KK = {
@@ -13,7 +12,7 @@ var KK = {
     url: 'assets/images/Kingkong brutal.png',
 
     // State
-    state: 'idle',        // idle, punch_right, punch_left, chest_beat
+    state: 'idle',        // idle, punch_right, punch_left, chest_beat, angry_walk
     animTimer: 0,
     currentFrame: 0,
     stateTimer: 0,
@@ -26,25 +25,36 @@ var KK = {
     facing: 1,
     transformScale: 1,
 
+    // Brutal movement
+    walkOffset: 0,        // offset gerakan kanan-kiri
+    walkPhase: 0,         // fase sinus untuk gerakan
+    isCharging: false,    // sedang nge-charge ke depan
+    chargeDir: 0,         // arah charge
+    chargePower: 0,       // kekuatan charge (0-1)
+
     // Attack cycle (20 detik = 1200 frames @ 60fps)
     cycleDuration: 1200,
     cycleTimer: 0,
 
     // Punch effects
     punchTimer: 0,
-    lastPunchSide: 0,     // -1 kiri, 1 kanan
+    lastPunchSide: 0,
 
     // Config
-    followDist: 140,      // jarak 3-4 langkah dari Sun Wukong (~140px)
-    followSpeed: 0.18,
+    followDist: 140,      // jarak dasar dari Sun Wukong
+    followSpeed: 0.15,
     spriteScale: 1.0,
+
+    // Scale target: 2x Sun Wukong
+    SW_TARGET_RATIO: 2.0, // 2x dari tinggi Sun Wukong
 
     // Animation config (frames per state)
     anims: {
-        idle:        { frames: [2, 3], fps: 4 },
-        punch_right: { frames: [0],    fps: 8 },
-        punch_left:  { frames: [1],    fps: 8 },
-        chest_beat:  { frames: [2, 3], fps: 6 }
+        idle:        { frames: [2],     fps: 3 },
+        angry_walk:  { frames: [0,1],   fps: 6 },
+        punch_right: { frames: [0],     fps: 10 },
+        punch_left:  { frames: [1],     fps: 10 },
+        chest_beat:  { frames: [2,3],   fps: 8 }
     }
 };
 
@@ -64,7 +74,7 @@ function loadKingKongSprite() {
             KK.sourceH = data.sourceH;
             KK.ready = true;
             KK.spriteScale = calcKKScale();
-            console.log('[KingKong] Sprite loaded, frames:', data.frames.length, 'sourceH:', data.sourceH);
+            console.log('[KingKong] Sprite loaded, frames:', data.frames.length, 'sourceH:', data.sourceH, 'scale:', KK.spriteScale);
             resolve();
         };
         img.onerror = function() {
@@ -84,7 +94,6 @@ function processKingKongSheet(img) {
     var sw = img.naturalWidth || img.width;
     var sh = img.naturalHeight || img.height;
 
-    // Buat canvas untuk analisis pixel
     var tc = document.createElement('canvas');
     tc.width = sw;
     tc.height = sh;
@@ -96,7 +105,7 @@ function processKingKongSheet(img) {
     // Deteksi frame boundaries dengan analisis kolom
     var colEdges = [];
     var prevHadPixel = false;
-    var minGap = sw / 20; // minimum gap antar frame
+    var minGap = sw / 20;
     var lastEdge = 0;
 
     for (var cx = 0; cx < sw; cx++) {
@@ -120,7 +129,6 @@ function processKingKongSheet(img) {
         colEdges.push(sw);
     }
 
-    // Pastikan ada tepat 4 frame
     while (colEdges.length < 5) colEdges.push(sw);
 
     var frames = [];
@@ -129,7 +137,6 @@ function processKingKongSheet(img) {
         var endX = Math.floor(colEdges[f + 1]);
         if (endX - startX < 10) endX = Math.min(sw, startX + Math.floor(sw / 4));
 
-        // Cari bounds aktual dalam frame
         var minX = endX, maxX = startX, minY = sh, maxY = 0;
         var found = false;
         for (var px = startX; px < endX; px++) {
@@ -151,22 +158,16 @@ function processKingKongSheet(img) {
 
         var fw2 = maxX - minX + 1;
         var fh = maxY - minY + 1;
-        var ox = fw2 / 2;   // center x
-        var oy = fh;        // bottom y (anchor di kaki)
+        var ox = fw2 / 2;
+        var oy = fh;
 
         frames.push({
-            x: minX,
-            y: minY,
-            w: fw2,
-            h: fh,
-            ox: ox,
-            oy: oy,
-            origX: startX,
-            origEndX: endX
+            x: minX, y: minY, w: fw2, h: fh,
+            ox: ox, oy: oy,
+            origX: startX, origEndX: endX
         });
     }
 
-    // Hitung max height untuk scaling
     var maxH = 0;
     for (var i = 0; i < frames.length; i++) {
         if (frames[i].h > maxH) maxH = frames[i].h;
@@ -176,16 +177,25 @@ function processKingKongSheet(img) {
 }
 
 // ============================================
-// CALCULATE SCALE
+// CALCULATE SCALE — 2x Sun Wukong
 // ============================================
 function calcKKScale() {
     if (!KK.sourceH) return 1.0;
-    var targetH = window.W < 600 ? 90 : (window.W < 1024 ? 110 : 130);
-    return Math.max(0.4, Math.min(2.0, targetH / KK.sourceH));
+
+    // Sun Wukong height reference (dari sprite lari)
+    var swHeight = (window.spriteData && window.spriteData.sourceH) ? window.spriteData.sourceH : 80;
+    var swScale = (typeof SPRITE_SCALE !== 'undefined') ? SPRITE_SCALE : 1.0;
+    var swPixelHeight = swHeight * swScale;
+
+    // Target: 2x tinggi Sun Wukong
+    var targetH = swPixelHeight * KK.SW_TARGET_RATIO;
+    var rawScale = targetH / KK.sourceH;
+
+    return Math.max(0.3, Math.min(2.5, rawScale));
 }
 
 // ============================================
-// UPDATE KING KONG
+// UPDATE KING KONG — BRUTAL MOVEMENT
 // ============================================
 function updateKingKong() {
     if (!window.player) return;
@@ -196,11 +206,32 @@ function updateKingKong() {
     // Update scale responsive
     kk.spriteScale = calcKKScale();
 
-    // === POSISI: 3-4 langkah di belakang Sun Wukong ===
-    // Jika player menghadap kanan, King Kong di kiri (belakang)
-    // Jika player menghadap kiri, King Kong di kanan (belakang)
-    var targetX = p.x - (kk.followDist * p.facing);
-    var targetY = p.y;
+    // === POSISI DASAR: 3-4 langkah di belakang Sun Wukong ===
+    var baseX = p.x - (kk.followDist * p.facing);
+    var baseY = p.y;
+
+    // === GERAKAN BRUTAL: kanan-kiri + marah ===
+    kk.walkPhase += 0.08;
+
+    // Charge power naik saat sedang menyerang
+    var isAttacking = (kk.state === 'punch_right' || kk.state === 'punch_left' || kk.state === 'chest_beat');
+    if (isAttacking) {
+        kk.chargePower = Math.min(1, kk.chargePower + 0.03);
+    } else {
+        kk.chargePower = Math.max(0, kk.chargePower - 0.05);
+    }
+
+    // Walk offset: gerakan kanan-kiri brutal
+    // Saat idle: gerakan kecil
+    // Saat attack: gerakan besar + charge ke depan
+    var walkAmp = 20 + (kk.chargePower * 60);  // amplitude gerakan
+    var chargeOffset = kk.chargePower * 50 * p.facing;  // charge ke depan saat attack
+
+    kk.walkOffset = Math.sin(kk.walkPhase) * walkAmp + chargeOffset;
+
+    // Target position dengan offset brutal
+    var targetX = baseX + kk.walkOffset;
+    var targetY = baseY + Math.abs(Math.sin(kk.walkPhase * 2)) * 5;  // sedikit bounce
 
     // Smooth follow
     kk.vx += (targetX - kk.x) * kk.followSpeed;
@@ -214,24 +245,25 @@ function updateKingKong() {
     kk.facing = p.facing;
 
     // === 20 DETIK ATTACK CYCLE ===
-    // 1200 frames = 20 detik @ 60fps
-    // Dibagi: 0-300: punch_right, 300-600: punch_left, 600-900: chest_beat, 900-1200: idle/brutal
     kk.cycleTimer++;
     if (kk.cycleTimer >= kk.cycleDuration) kk.cycleTimer = 0;
 
     var phase = kk.cycleTimer;
     var oldState = kk.state;
 
+    // Cycle: 0-300=angry_walk, 300-500=punch_right, 500-700=punch_left, 700-900=chest_beat, 900-1200=angry_walk
     if (phase < 300) {
+        kk.state = 'angry_walk';
+    } else if (phase < 500) {
         kk.state = 'punch_right';
         kk.lastPunchSide = 1;
-    } else if (phase < 600) {
+    } else if (phase < 700) {
         kk.state = 'punch_left';
         kk.lastPunchSide = -1;
     } else if (phase < 900) {
         kk.state = 'chest_beat';
     } else {
-        kk.state = 'idle';
+        kk.state = 'angry_walk';
     }
 
     // State change reset
@@ -239,6 +271,10 @@ function updateKingKong() {
         kk.animTimer = 0;
         kk.currentFrame = 0;
         kk.stateTimer = 0;
+        // Reset charge saat ganti state
+        if (kk.state === 'punch_right' || kk.state === 'punch_left') {
+            kk.isCharging = true;
+        }
     }
 
     // === ANIMATION ===
@@ -251,20 +287,24 @@ function updateKingKong() {
         kk.currentFrame = (kk.currentFrame + 1) % anim.frames.length;
     }
 
-    // === PUNCH EFFECTS (Brutal Smash) ===
-    // Smash setiap 15 frame saat punching
-    if ((kk.state === 'punch_right' || kk.state === 'punch_left') && kk.stateTimer % 15 === 0) {
+    // === BRUTAL SMASH — saat punching ===
+    if ((kk.state === 'punch_right' || kk.state === 'punch_left') && kk.stateTimer % 12 === 0) {
         doBrutalSmash();
     }
 
-    // Chest beat effect (menakuti) - shake dan particles
-    if (kk.state === 'chest_beat' && kk.stateTimer % 20 === 0) {
+    // === CHEST BEAT EFFECT — menakuti ===
+    if (kk.state === 'chest_beat' && kk.stateTimer % 15 === 0) {
         doChestBeatEffect();
     }
 
-    // Update transform scale (grow/shrink smooth)
-    var targetScale = (kk.state === 'idle') ? 1.0 : 1.15;
-    kk.transformScale += (targetScale - kk.transformScale) * 0.1;
+    // === ANGRY WALK — particles saat jalan marah ===
+    if (kk.state === 'angry_walk' && kk.stateTimer % 8 === 0) {
+        spawnAngryParticles();
+    }
+
+    // Update transform scale (2x target)
+    var targetScale = isAttacking ? 2.1 : 2.0;
+    kk.transformScale += (targetScale - kk.transformScale) * 0.08;
 }
 
 window.updateKingKong = updateKingKong;
@@ -274,41 +314,40 @@ window.updateKingKong = updateKingKong;
 // ============================================
 function doBrutalSmash() {
     var kk = KK;
-    var smashX = kk.x + (kk.lastPunchSide * 80);
-    var smashY = kk.y - 20;
-    var smashRadius = 180;
+    var smashX = kk.x + (kk.lastPunchSide * 70);
+    var smashY = kk.y - 30;
+    var smashRadius = 160;
 
-    // Visual explosion particles
-    for (var e = 0; e < 12; e++) {
-        var ea = (e / 12) * 6.28;
+    // Visual explosion
+    for (var e = 0; e < 10; e++) {
+        var ea = (e / 10) * 6.28;
         var sp = rnd(4, 10);
         window.particles.push({
             x: smashX + Math.cos(ea) * 15,
             y: smashY + Math.sin(ea) * 15,
             vx: Math.cos(ea) * sp,
             vy: Math.sin(ea) * sp - rnd(2, 6),
-            life: rnd(25, 45),
-            ml: 45,
+            life: rnd(25, 45), ml: 45,
             size: rnd(6, 16),
             color: pick(['#FFD700', '#FF4444', '#FF8C00', '#FFF', '#8B0000'])
         });
     }
 
-    // Shockwave ring
+    // Shockwave
     window.particles.push({
         x: smashX, y: smashY,
         vx: 0, vy: 0,
         life: 25, ml: 25,
-        size: 15,
-        targetSize: smashRadius * 1.5,
-        color: 'rgba(255,80,0,0.35)',
+        size: 12,
+        targetSize: smashRadius * 1.3,
+        color: 'rgba(255,60,0,0.35)',
         isShockwave: true
     });
 
     // Screen shake
     if (window.triggerShake) triggerShake(10, 14);
 
-    // Damage ghosts in range
+    // Damage ghosts
     var hitCount = 0;
     if (window.ghosts) {
         for (var i = 0; i < window.ghosts.length; i++) {
@@ -327,7 +366,7 @@ function doBrutalSmash() {
         }
     }
 
-    // Damage boss if in range
+    // Damage boss
     if (window.boss && window.bossState === 'fight') {
         var distToBoss = Math.hypot(window.boss.x - smashX, window.boss.y - smashY);
         if (distToBoss < smashRadius + window.boss.size) {
@@ -337,16 +376,12 @@ function doBrutalSmash() {
         }
     }
 
-    // SFX
     if (window.sfxHit) sfxHit();
     if (window.sfxQuake) sfxQuake();
 
-    // Floating text
     if (hitCount > 0 && window.showFloatingText) {
-        showFloatingText('💥 BRUTAL SMASH! x' + hitCount, smashX, smashY - 80, '#FFD700');
+        showFloatingText('💥 BRUTAL! x' + hitCount, smashX, smashY - 80, '#FFD700');
     }
-
-    console.log('[KingKong] Brutal Smash! hits:', hitCount);
 }
 
 // ============================================
@@ -355,41 +390,69 @@ function doBrutalSmash() {
 function doChestBeatEffect() {
     var kk = KK;
 
-    // Heavy screen shake
-    if (window.triggerShake) triggerShake(6, 10);
+    if (window.triggerShake) triggerShake(7, 12);
 
     // Roar particles
-    for (var i = 0; i < 8; i++) {
+    for (var i = 0; i < 10; i++) {
         var a = rnd(0, 6.28);
         window.particles.push({
-            x: kk.x + Math.cos(a) * 30,
-            y: kk.y - 60 + Math.sin(a) * 20,
-            vx: Math.cos(a) * rnd(2, 5),
-            vy: Math.sin(a) * rnd(2, 5) - 3,
-            life: rnd(20, 35),
-            ml: 35,
-            size: rnd(5, 12),
-            color: pick(['#FF4444', '#FFD700', '#FF8C00'])
+            x: kk.x + Math.cos(a) * 25,
+            y: kk.y - 50 + Math.sin(a) * 15,
+            vx: Math.cos(a) * rnd(2, 6),
+            vy: Math.sin(a) * rnd(2, 6) - 4,
+            life: rnd(20, 40), ml: 40,
+            size: rnd(6, 14),
+            color: pick(['#FF4444', '#FFD700', '#FF8C00', '#FF0000'])
         });
     }
 
-    // Fear effect: push ghosts away
+    // Fear: push ghosts away
     if (window.ghosts) {
         for (var i = 0; i < window.ghosts.length; i++) {
             var g = window.ghosts[i];
             var dist = Math.hypot(g.x - kk.x, g.y - kk.y);
-            if (dist < 250) {
+            if (dist < 280) {
                 var dx = g.x - kk.x;
                 var dy = g.y - kk.y;
                 var d = Math.hypot(dx, dy) || 1;
-                g.vx += (dx / d) * 3;  // push away
-                g.vy += (dy / d) * 3 - 2;
+                g.vx += (dx / d) * 4;
+                g.vy += (dy / d) * 4 - 3;
                 g.hitFlash = 5;
             }
         }
     }
 
     if (window.sfxQuake) sfxQuake();
+}
+
+// ============================================
+// ANGRY WALK PARTICLES
+// ============================================
+function spawnAngryParticles() {
+    var kk = KK;
+    // Dust saat kaki menginjak
+    window.particles.push({
+        x: kk.x + rnd(-20, 20),
+        y: kk.y + 10,
+        vx: rnd(-1, 1),
+        vy: rnd(-1, -3),
+        life: rnd(15, 25), ml: 25,
+        size: rnd(4, 10),
+        color: 'rgba(139,69,19,0.5)'
+    });
+
+    // Angry aura spark
+    if (Math.random() < 0.3) {
+        window.particles.push({
+            x: kk.x + rnd(-30, 30),
+            y: kk.y - rnd(20, 60),
+            vx: rnd(-0.5, 0.5),
+            vy: rnd(-2, -4),
+            life: rnd(10, 20), ml: 20,
+            size: rnd(3, 7),
+            color: pick(['#FF4444', '#FF8C00'])
+        });
+    }
 }
 
 // ============================================
@@ -427,9 +490,9 @@ function drawKingKong() {
 
     // Shadow
     window.X.save();
-    window.X.globalAlpha = 0.2;
+    window.X.globalAlpha = 0.25;
     window.X.beginPath();
-    window.X.ellipse(0, drawH * 0.5 + 5, drawW * 0.4, 8, 0, 0, 6.28);
+    window.X.ellipse(0, drawH * 0.5 + 3, drawW * 0.35, 6, 0, 0, 6.28);
     window.X.fillStyle = '#000';
     window.X.fill();
     window.X.restore();
@@ -440,102 +503,138 @@ function drawKingKong() {
         drawX = -drawX - drawW;
     }
 
-    // Glow aura saat attacking
-    if (kk.state !== 'idle') {
-        var ag = window.X.createRadialGradient(0, -drawH * 0.2, drawW * 0.2, 0, -drawH * 0.2, drawW * 0.8);
-        ag.addColorStop(0, 'rgba(255,100,0,0.2)');
-        ag.addColorStop(0.5, 'rgba(255,50,0,0.08)');
+    // === ANGRY AURA ===
+    var isAngry = (kk.state !== 'idle');
+    if (isAngry) {
+        // Red glow aura
+        var ag = window.X.createRadialGradient(0, -drawH * 0.25, drawW * 0.15, 0, -drawH * 0.25, drawW * 0.7);
+        ag.addColorStop(0, 'rgba(255,80,0,0.18)');
+        ag.addColorStop(0.5, 'rgba(255,30,0,0.08)');
         ag.addColorStop(1, 'rgba(255,0,0,0)');
         window.X.beginPath();
-        window.X.arc(0, -drawH * 0.2, drawW * 0.8, 0, 6.28);
+        window.X.arc(0, -drawH * 0.25, drawW * 0.7, 0, 6.28);
         window.X.fillStyle = ag;
         window.X.fill();
+
+        // Pulse effect saat charge
+        if (kk.chargePower > 0.3) {
+            var pulse = Math.sin(window.frame * 0.2) * 0.1 + 0.15;
+            window.X.globalAlpha = pulse * kk.chargePower;
+            window.X.beginPath();
+            window.X.arc(0, -drawH * 0.25, drawW * 0.9, 0, 6.28);
+            window.X.fillStyle = 'rgba(255,0,0,0.2)';
+            window.X.fill();
+            window.X.globalAlpha = 1;
+        }
     }
 
-    // Draw sprite frame
+    // === DRAW SPRITE FRAME ===
     window.X.drawImage(
         kk.img,
         fr.x, fr.y, fr.w, fr.h,
         drawX, drawY, drawW, drawH
     );
 
+    // === ANGRY OVERLAY (mata merah glow) ===
+    if (isAngry) {
+        window.X.globalCompositeOperation = 'screen';
+        var glowAlpha = 0.15 + (kk.chargePower * 0.2);
+        window.X.fillStyle = 'rgba(255,50,0,' + glowAlpha + ')';
+        window.X.fillRect(drawX, drawY, drawW, drawH * 0.4);
+        window.X.globalCompositeOperation = 'source-over';
+    }
+
     window.X.restore();
 
-    // Timer bar di atas King Kong (sisa waktu transform)
+    // === STATE LABEL DI ATAS KING KONG ===
+    var labelText = '';
+    var labelColor = '#FFF';
+    if (kk.state === 'punch_right') { labelText = '👊 PUNCH!'; labelColor = '#FF4444'; }
+    else if (kk.state === 'punch_left') { labelText = '👊 PUNCH!'; labelColor = '#FF4444'; }
+    else if (kk.state === 'chest_beat') { labelText = '💢 ROAR!'; labelColor = '#FFD700'; }
+    else if (kk.state === 'angry_walk') { labelText = '👹 ANGRY'; labelColor = '#FF8C00'; }
+
+    if (labelText && window.frame % 30 < 20) {
+        window.X.fillStyle = labelColor;
+        window.X.font = 'bold 12px Fredoka One';
+        window.X.textAlign = 'center';
+        window.X.fillText(labelText, sx, sy - drawH - 10);
+    }
+
+    // === TIMER BAR ===
     if (window.petState === 'kingkong' && window.petTransformTimer > 0) {
-        var barW = 80;
-        var barH = 6;
+        var barW = 70;
+        var barH = 5;
         var pct = window.petTransformTimer / window.PET_KINGKONG_DURATION;
         window.X.fillStyle = 'rgba(0,0,0,0.6)';
-        window.X.fillRect(sx - barW/2, sy - drawH - 15, barW, barH);
+        window.X.fillRect(sx - barW/2, sy - drawH - 22, barW, barH);
         window.X.fillStyle = pct > 0.3 ? '#FF4444' : '#FFD700';
-        window.X.fillRect(sx - barW/2, sy - drawH - 15, barW * pct, barH);
+        window.X.fillRect(sx - barW/2, sy - drawH - 22, barW * pct, barH);
         window.X.strokeStyle = '#FFF';
         window.X.lineWidth = 1;
-        window.X.strokeRect(sx - barW/2, sy - drawH - 15, barW, barH);
+        window.X.strokeRect(sx - barW/2, sy - drawH - 22, barW, barH);
     }
 }
 
 window.drawKingKong = drawKingKong;
 
 // ============================================
-// FALLBACK DRAW (kalau sprite gagal load)
+// FALLBACK DRAW
 // ============================================
 function drawKingKongFallback() {
     var kk = KK;
     var sx = kk.x - window.cam.x;
     var sy = kk.y - window.cam.y;
-    var s = 50 * kk.transformScale;
+    var s = 45 * kk.transformScale;
 
     window.X.save();
     window.X.translate(sx, sy);
 
-    // Shadow
-    window.X.globalAlpha = 0.2;
+    window.X.globalAlpha = 0.25;
     window.X.beginPath();
-    window.X.ellipse(0, s * 0.9, s * 0.7, s * 0.15, 0, 0, 6.28);
+    window.X.ellipse(0, s * 0.85, s * 0.6, s * 0.12, 0, 0, 6.28);
     window.X.fillStyle = '#000';
     window.X.fill();
     window.X.globalAlpha = 1;
 
-    // Body (dark brown)
+    // Body
     window.X.fillStyle = '#3D2914';
-    window.X.fillRect(-s * 0.5, -s * 0.5, s, s * 0.8);
+    window.X.fillRect(-s * 0.45, -s * 0.4, s * 0.9, s * 0.7);
 
     // Head
     window.X.fillStyle = '#4A3728';
     window.X.beginPath();
-    window.X.arc(0, -s * 0.7, s * 0.35, 0, 6.28);
+    window.X.arc(0, -s * 0.65, s * 0.3, 0, 6.28);
     window.X.fill();
 
-    // Eyes (red glow)
+    // Red angry eyes
     window.X.fillStyle = '#FF0000';
+    window.X.shadowColor = '#FF0000';
+    window.X.shadowBlur = 8;
     window.X.beginPath();
-    window.X.arc(-s * 0.12, -s * 0.75, s * 0.08, 0, 6.28);
+    window.X.arc(-s * 0.1, -s * 0.7, s * 0.07, 0, 6.28);
     window.X.fill();
     window.X.beginPath();
-    window.X.arc(s * 0.12, -s * 0.75, s * 0.08, 0, 6.28);
+    window.X.arc(s * 0.1, -s * 0.7, s * 0.07, 0, 6.28);
     window.X.fill();
+    window.X.shadowBlur = 0;
 
     // Arms
     window.X.fillStyle = '#3D2914';
     if (kk.state === 'punch_right') {
-        window.X.fillRect(s * 0.3, -s * 0.4, s * 0.6, s * 0.25);
+        window.X.fillRect(s * 0.25, -s * 0.35, s * 0.5, s * 0.2);
     } else if (kk.state === 'punch_left') {
-        window.X.fillRect(-s * 0.9, -s * 0.4, s * 0.6, s * 0.25);
-    } else if (kk.state === 'chest_beat') {
-        window.X.fillRect(-s * 0.8, -s * 0.3, s * 0.4, s * 0.2);
-        window.X.fillRect(s * 0.4, -s * 0.3, s * 0.4, s * 0.2);
+        window.X.fillRect(-s * 0.75, -s * 0.35, s * 0.5, s * 0.2);
     } else {
-        window.X.fillRect(-s * 0.7, -s * 0.2, s * 0.25, s * 0.5);
-        window.X.fillRect(s * 0.45, -s * 0.2, s * 0.25, s * 0.5);
+        window.X.fillRect(-s * 0.6, -s * 0.15, s * 0.2, s * 0.4);
+        window.X.fillRect(s * 0.4, -s * 0.15, s * 0.2, s * 0.4);
     }
 
     window.X.restore();
 }
 
 // ============================================
-// INIT KING KONG (panggil saat spawn pet)
+// INIT KING KONG
 // ============================================
 function initKingKong() {
     KK.x = window.player ? window.player.x - 140 : 60;
@@ -547,8 +646,12 @@ function initKingKong() {
     KK.currentFrame = 0;
     KK.stateTimer = 0;
     KK.cycleTimer = 0;
-    KK.transformScale = 1;
+    KK.transformScale = 2.0;
     KK.facing = 1;
+    KK.walkOffset = 0;
+    KK.walkPhase = 0;
+    KK.chargePower = 0;
+    KK.isCharging = false;
     console.log('[KingKong] Initialized at', KK.x, KK.y);
 }
 
