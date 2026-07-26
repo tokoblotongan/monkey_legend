@@ -193,8 +193,11 @@ function loadSpriteSheet() {
         // Load sprite lompat juga
         var jumpPromise = loadJumpSprite();
 
+        // Load King Kong sprite
+        var kkPromise = (typeof loadKingKongSprite === 'function') ? loadKingKongSprite() : Promise.resolve();
+
         if (typeof loadCloudImage === 'function') {
-            Promise.all([loadCloudImage(), jumpPromise]).then(function() {
+            Promise.all([loadCloudImage(), jumpPromise, kkPromise]).then(function() {
                 loadFill.style.width = '80%';
                 loadText.textContent = 'Memuat awan...';
                 checkComplete();
@@ -202,7 +205,7 @@ function loadSpriteSheet() {
                 checkComplete();
             });
         } else {
-            jumpPromise.then(checkComplete).catch(checkComplete);
+            Promise.all([jumpPromise, kkPromise]).then(checkComplete).catch(checkComplete);
         }
     });
 }
@@ -804,6 +807,9 @@ function spawnPet() {
     petState = 'normal';
     petTransformTimer = 0;
     showFloatingText('Pet Monyet Bergabung!', player.x, player.y - 60, '#8BC34A');
+
+    // Init King Kong position
+    if (typeof initKingKong === 'function') initKingKong();
 }
 
 function updatePet() {
@@ -853,86 +859,29 @@ function updatePet() {
         petTransformTimer--;
         pet.punchTimer++;
 
-        // King Kong follows player closely
-        var targetX = player.x - 120 * player.facing;
-        var targetY = player.y - 40;
-        pet.x += (targetX - pet.x) * 0.25;
-        pet.y += (targetY - pet.y) * 0.25;
+        // King Kong follows player at 3-4 steps distance (~140px)
+        var targetX = player.x - (140 * player.facing);
+        var targetY = player.y;
+        pet.x += (targetX - pet.x) * 0.18;
+        pet.y += (targetY - pet.y) * 0.18;
 
-        // AUTO SMASH — alternating left/right punch every 12 frames
-        if (pet.punchTimer % 12 === 0) {
-            var punchSide = (Math.floor(pet.punchTimer / 12) % 2 === 0) ? 1 : -1;
-            var smashX = pet.x + (punchSide * pet.size * pet.transformScale * 0.7);
-            var smashY = pet.y + pet.size * pet.transformScale * 0.3;
-            var smashRadius = 200;
-
-            // Visual SMASH explosion
-            for (var e = 0; e < 8; e++) {
-                var ea = (e / 8) * 6.28;
-                particles.push({
-                    x: smashX + Math.cos(ea) * 20,
-                    y: smashY + Math.sin(ea) * 20,
-                    vx: Math.cos(ea) * 6,
-                    vy: Math.sin(ea) * 6 - 3,
-                    life: 25, ml: 25,
-                    size: rnd(8, 18),
-                    color: pick(['#FFD700', '#FF4444', '#FF8C00', '#FFF'])
-                });
+        // Sync King Kong module position
+        if (typeof KK !== 'undefined') {
+            KK.x = pet.x;
+            KK.y = pet.y;
+            KK.facing = player.facing;
+            KK.transformScale = pet.transformScale;
+            // Update King Kong animation & attacks
+            if (typeof updateKingKong === 'function') {
+                updateKingKong();
+                // Copy back position (in case KK module moved it)
+                pet.x = KK.x;
+                pet.y = KK.y;
             }
-
-            // Shockwave ring
-            particles.push({
-                x: smashX, y: smashY,
-                vx: 0, vy: 0,
-                life: 20, ml: 20,
-                size: 10,
-                targetSize: smashRadius * 1.5,
-                color: 'rgba(255,100,0,0.4)',
-                isShockwave: true
-            });
-
-            // Damage ALL ghosts in BIG range
-            var hitCount = 0;
-            for (var i = 0; i < ghosts.length; i++) {
-                var g = ghosts[i];
-                var distToSmash = Math.hypot(g.x - smashX, g.y - smashY);
-                if (distToSmash < smashRadius) {
-                    g.hp -= 8;
-                    g.hitFlash = 15;
-                    var dx = g.x - smashX;
-                    var dy = g.y - smashY;
-                    var d = Math.hypot(dx, dy) || 1;
-                    g.vx = (dx / d) * 12;
-                    g.vy = -10;
-                    spawnP(g.x, g.y, 8, '#FFD700', 1.5, 1);
-                    hitCount++;
-                }
-            }
-
-            // Also damage boss if in range
-            if (boss && bossState === 'fight') {
-                var distToBoss = Math.hypot(boss.x - smashX, boss.y - smashY);
-                if (distToBoss < smashRadius + boss.size) {
-                    boss.hp -= 3;
-                    boss.hitFlash = 10;
-                    spawnP(boss.x, boss.y, 10, '#FFD700', 1.5);
-                    hitCount++;
-                }
-            }
-
-            triggerShake(8, 12);
-            sfxHit();
-            sfxQuake();
-
-            if (hitCount > 0) {
-                showFloatingText('💥 SMASH! x' + hitCount, smashX, smashY - 100, '#FFD700');
-            }
-
-            console.log('[KingKong] SMASH! hits:', hitCount, 'ghosts:', ghosts.length);
         }
 
         // Countdown warning
-if (petTransformTimer <= 0) {
+        if (petTransformTimer <= 0) {
             petState = 'cooldown';
             petTransformTimer = PET_COOLDOWN;
             petPoints = 0; // reset points
@@ -1006,152 +955,18 @@ function drawPet() {
 
     // === KING KONG MODE ===
     if (petState === 'kingkong' || petState === 'transforming') {
-        var kkScale = pet.transformScale;
-        var shakeX = (petState === 'kingkong') ? Math.sin(frame * 0.3) * 3 : 0;
-
-        X.save();
-        X.translate(shakeX, 0);
-
-        // Shadow
-        X.globalAlpha = 0.2;
-        X.beginPath();
-        X.ellipse(0, s * 0.9, s * 0.7, s * 0.15, 0, 0, 6.28);
-        X.fillStyle = '#000'; X.fill();
-        X.globalAlpha = 1;
-
-        // LEGS (green grass-like)
-        X.fillStyle = '#228B22';
-        // Left leg
-        X.fillRect(-s * 0.45, s * 0.1, s * 0.35, s * 0.7);
-        // Right leg
-        X.fillRect(s * 0.1, s * 0.1, s * 0.35, s * 0.7);
-        // Feet
-        X.fillStyle = '#1B6B1B';
-        X.beginPath(); X.ellipse(-s * 0.27, s * 0.82, s * 0.22, s * 0.1, 0, 0, 6.28); X.fill();
-        X.beginPath(); X.ellipse(s * 0.27, s * 0.82, s * 0.22, s * 0.1, 0, 0, 6.28); X.fill();
-        // Toes
-        X.fillStyle = '#3D2914';
-        for (var t = -1; t <= 1; t++) {
-            X.beginPath(); X.arc(-s * 0.27 + t * s * 0.12, s * 0.88, s * 0.04, 0, 6.28); X.fill();
-            X.beginPath(); X.arc(s * 0.27 + t * s * 0.12, s * 0.88, s * 0.04, 0, 6.28); X.fill();
-        }
-
-        // BODY (blue muscular - six pack)
-        X.fillStyle = '#1E90FF';
-        X.fillRect(-s * 0.5, -s * 0.5, s, s * 0.7);
-
-        // Six pack abs
-        X.fillStyle = '#1873CC';
-        for (var row = 0; row < 3; row++) {
-            for (var col = 0; col < 2; col++) {
-                var ax = -s * 0.18 + col * s * 0.36;
-                var ay = -s * 0.25 + row * s * 0.18;
-                X.beginPath();
-                X.ellipse(ax, ay, s * 0.12, s * 0.07, 0, 0, 6.28);
-                X.fill();
-            }
-        }
-        // Chest pecs
-        X.fillStyle = '#1873CC';
-        X.beginPath(); X.ellipse(-s * 0.2, -s * 0.42, s * 0.22, s * 0.12, 0, 0, 6.28); X.fill();
-        X.beginPath(); X.ellipse(s * 0.2, -s * 0.42, s * 0.22, s * 0.12, 0, 0, 6.28); X.fill();
-
-        // ARM FUR (dark brown furry arms)
-        X.fillStyle = '#3D2914';
-        // Left arm
-        X.fillRect(-s * 0.85, -s * 0.45, s * 0.3, s * 0.7);
-        X.beginPath(); X.ellipse(-s * 0.7, s * 0.3, s * 0.18, s * 0.15, 0, 0, 6.28); X.fill();
-        // Right arm
-        X.fillRect(s * 0.55, -s * 0.45, s * 0.3, s * 0.7);
-        X.beginPath(); X.ellipse(s * 0.7, s * 0.3, s * 0.18, s * 0.15, 0, 0, 6.28); X.fill();
-
-        // FISTS — alternating punch animation
-        var punchCycle = pet.punchTimer % 24;
-        var leftPunch = 0, rightPunch = 0;
-        if (punchCycle < 6) {
-            leftPunch = Math.sin(punchCycle / 6 * Math.PI) * s * 0.25;
-        } else if (punchCycle < 12) {
-            rightPunch = Math.sin((punchCycle - 6) / 6 * Math.PI) * s * 0.25;
-        } else if (punchCycle < 18) {
-            leftPunch = Math.sin((punchCycle - 12) / 6 * Math.PI) * s * 0.25;
+        // Gunakan sprite King Kong jika tersedia
+        if (typeof drawKingKong === 'function' && KK && KK.ready) {
+            // Sync posisi KK dengan pet
+            KK.x = pet.x;
+            KK.y = pet.y;
+            KK.facing = player.facing;
+            KK.transformScale = pet.transformScale;
+            drawKingKong();
         } else {
-            rightPunch = Math.sin((punchCycle - 18) / 6 * Math.PI) * s * 0.25;
+            // Fallback: gambar manual (simplified)
+            drawKingKongFallback();
         }
-
-        X.fillStyle = '#2A1A0E';
-        // Left fist with punch
-        X.beginPath(); X.arc(-s * 0.7, s * 0.35 - leftPunch, s * 0.18, 0, 6.28); X.fill();
-        // Right fist with punch
-        X.beginPath(); X.arc(s * 0.7, s * 0.35 - rightPunch, s * 0.18, 0, 6.28); X.fill();
-
-        // Punch glow effect when smashing
-        if (pet.punchTimer % 12 < 3) {
-            X.globalAlpha = 0.4;
-            var glowColor = (pet.punchTimer % 24 < 12) ? '#FFD700' : '#FF4444';
-            X.fillStyle = glowColor;
-            if (pet.punchTimer % 24 < 12) {
-                X.beginPath(); X.arc(-s * 0.7, s * 0.35 - leftPunch, s * 0.25, 0, 6.28); X.fill();
-            } else {
-                X.beginPath(); X.arc(s * 0.7, s * 0.35 - rightPunch, s * 0.25, 0, 6.28); X.fill();
-            }
-            X.globalAlpha = 1;
-        }
-
-        // HEAD (yellow smiley face with brown fur)
-        X.fillStyle = '#3D2914';
-        X.beginPath(); X.arc(0, -s * 0.65, s * 0.42, 0, 6.28); X.fill();
-
-        // Face
-        X.fillStyle = '#FFD700';
-        X.beginPath(); X.arc(0, -s * 0.65, s * 0.32, 0, 6.28); X.fill();
-
-        // Eyes (black smiley)
-        X.fillStyle = '#000';
-        X.beginPath(); X.arc(-s * 0.1, -s * 0.7, s * 0.06, 0, 6.28); X.fill();
-        X.beginPath(); X.arc(s * 0.1, -s * 0.7, s * 0.06, 0, 6.28); X.fill();
-
-        // Smile
-        X.strokeStyle = '#000'; X.lineWidth = s * 0.025;
-        X.beginPath();
-        X.arc(0, -s * 0.62, s * 0.12, 0.2, Math.PI - 0.2);
-        X.stroke();
-
-        // Hair/fur on top
-        X.fillStyle = '#3D2914';
-        for (var h = -2; h <= 2; h++) {
-            X.beginPath();
-            X.moveTo(h * s * 0.1, -s * 0.95);
-            X.lineTo(h * s * 0.1 - s * 0.05, -s * 1.1);
-            X.lineTo(h * s * 0.1 + s * 0.05, -s * 1.1);
-            X.closePath(); X.fill();
-        }
-
-        // Glow aura when kingkong
-        if (petState === 'kingkong') {
-            var ag = X.createRadialGradient(0, 0, s * 0.3, 0, 0, s * 1.5);
-            ag.addColorStop(0, 'rgba(255,100,0,0.15)');
-            ag.addColorStop(0.5, 'rgba(255,50,0,0.08)');
-            ag.addColorStop(1, 'rgba(255,0,0,0)');
-            X.beginPath(); X.arc(0, 0, s * 1.5, 0, 6.28);
-            X.fillStyle = ag; X.fill();
-        }
-
-        X.restore();
-
-        // Timer bar above King Kong
-        if (petState === 'kingkong') {
-            var barW = s * 0.8;
-            var barH = s * 0.06;
-            var pct = petTransformTimer / PET_KINGKONG_DURATION;
-            X.fillStyle = 'rgba(0,0,0,0.6)';
-            X.fillRect(-barW/2, -s * 1.25, barW, barH);
-            X.fillStyle = pct > 0.3 ? '#FF4444' : '#FFD700';
-            X.fillRect(-barW/2, -s * 1.25, barW * pct, barH);
-            X.strokeStyle = '#FFF'; X.lineWidth = 1;
-            X.strokeRect(-barW/2, -s * 1.25, barW, barH);
-        }
-
-        X.restore();
         return;
     }
 
@@ -1969,6 +1784,9 @@ function initGame() {
 
     // Spawn pet
     spawnPet();
+
+    // Reset King Kong
+    if (typeof initKingKong === 'function') initKingKong();
 
     platforms.push(makePlat(-100, H - 35, 600, 'ground'));
     genX = 500;
