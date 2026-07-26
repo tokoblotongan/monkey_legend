@@ -854,58 +854,85 @@ function updatePet() {
         pet.punchTimer++;
 
         // King Kong follows player closely
-        var targetX = player.x - 100 * player.facing;
-        var targetY = player.y - 30;
-        pet.x += (targetX - pet.x) * 0.2;
-        pet.y += (targetY - pet.y) * 0.2;
+        var targetX = player.x - 120 * player.facing;
+        var targetY = player.y - 40;
+        pet.x += (targetX - pet.x) * 0.25;
+        pet.y += (targetY - pet.y) * 0.25;
 
-        // AUTO SMASH enemies every 15 frames
-        if (pet.punchTimer % 15 === 0) {
-            var smashX = pet.x + (player.facing * 80);
-            var smashY = pet.y;
-            var smashRadius = 120;
+        // AUTO SMASH — alternating left/right punch every 12 frames
+        if (pet.punchTimer % 12 === 0) {
+            var punchSide = (Math.floor(pet.punchTimer / 12) % 2 === 0) ? 1 : -1;
+            var smashX = pet.x + (punchSide * pet.size * pet.transformScale * 0.7);
+            var smashY = pet.y + pet.size * pet.transformScale * 0.3;
+            var smashRadius = 200;
 
-            // Visual smash effect
-            particles.push({
-                x: smashX, y: smashY,
-                vx: 0, vy: -2,
-                life: 20, ml: 20,
-                size: 40,
-                color: 'rgba(255,200,0,0.5)'
-            });
-
-            // Damage all ghosts in range
-            for (var i = 0; i < ghosts.length; i++) {
-                var g = ghosts[i];
-                if (Math.hypot(g.x - smashX, g.y - smashY) < smashRadius) {
-                    g.hp -= 5;
-                    g.hitFlash = 10;
-                    g.vx = (g.x - smashX) * 0.3;
-                    g.vy = -8;
-                    spawnP(g.x, g.y, 6, '#FFD700', 1.2);
-                }
+            // Visual SMASH explosion
+            for (var e = 0; e < 8; e++) {
+                var ea = (e / 8) * 6.28;
+                particles.push({
+                    x: smashX + Math.cos(ea) * 20,
+                    y: smashY + Math.sin(ea) * 20,
+                    vx: Math.cos(ea) * 6,
+                    vy: Math.sin(ea) * 6 - 3,
+                    life: 25, ml: 25,
+                    size: rnd(8, 18),
+                    color: pick(['#FFD700', '#FF4444', '#FF8C00', '#FFF'])
+                });
             }
 
-            // Screen shake
-            triggerShake(5, 8);
-            sfxHit();
-
-            // Spawn smash ring
+            // Shockwave ring
             particles.push({
                 x: smashX, y: smashY,
                 vx: 0, vy: 0,
-                life: 15, ml: 15,
-                size: smashRadius,
-                color: 'rgba(255,100,0,0.2)'
+                life: 20, ml: 20,
+                size: 10,
+                targetSize: smashRadius * 1.5,
+                color: 'rgba(255,100,0,0.4)',
+                isShockwave: true
             });
+
+            // Damage ALL ghosts in BIG range
+            var hitCount = 0;
+            for (var i = 0; i < ghosts.length; i++) {
+                var g = ghosts[i];
+                var distToSmash = Math.hypot(g.x - smashX, g.y - smashY);
+                if (distToSmash < smashRadius) {
+                    g.hp -= 8;
+                    g.hitFlash = 15;
+                    var dx = g.x - smashX;
+                    var dy = g.y - smashY;
+                    var d = Math.hypot(dx, dy) || 1;
+                    g.vx = (dx / d) * 12;
+                    g.vy = -10;
+                    spawnP(g.x, g.y, 8, '#FFD700', 1.5, 1);
+                    hitCount++;
+                }
+            }
+
+            // Also damage boss if in range
+            if (boss && bossState === 'fight') {
+                var distToBoss = Math.hypot(boss.x - smashX, boss.y - smashY);
+                if (distToBoss < smashRadius + boss.size) {
+                    boss.hp -= 3;
+                    boss.hitFlash = 10;
+                    spawnP(boss.x, boss.y, 10, '#FFD700', 1.5);
+                    hitCount++;
+                }
+            }
+
+            triggerShake(8, 12);
+            sfxHit();
+            sfxQuake();
+
+            if (hitCount > 0) {
+                showFloatingText('💥 SMASH! x' + hitCount, smashX, smashY - 100, '#FFD700');
+            }
+
+            console.log('[KingKong] SMASH! hits:', hitCount, 'ghosts:', ghosts.length);
         }
 
         // Countdown warning
-        if (petTransformTimer <= 60 && petTransformTimer % 20 === 0) {
-            showFloatingText((Math.ceil(petTransformTimer/60)) + 's', pet.x, pet.y - 120, '#FF4444');
-        }
-
-        if (petTransformTimer <= 0) {
+if (petTransformTimer <= 0) {
             petState = 'cooldown';
             petTransformTimer = PET_COOLDOWN;
             petPoints = 0; // reset points
@@ -1038,11 +1065,37 @@ function drawPet() {
         X.fillRect(s * 0.55, -s * 0.45, s * 0.3, s * 0.7);
         X.beginPath(); X.ellipse(s * 0.7, s * 0.3, s * 0.18, s * 0.15, 0, 0, 6.28); X.fill();
 
-        // Fists
+        // FISTS — alternating punch animation
+        var punchCycle = pet.punchTimer % 24;
+        var leftPunch = 0, rightPunch = 0;
+        if (punchCycle < 6) {
+            leftPunch = Math.sin(punchCycle / 6 * Math.PI) * s * 0.25;
+        } else if (punchCycle < 12) {
+            rightPunch = Math.sin((punchCycle - 6) / 6 * Math.PI) * s * 0.25;
+        } else if (punchCycle < 18) {
+            leftPunch = Math.sin((punchCycle - 12) / 6 * Math.PI) * s * 0.25;
+        } else {
+            rightPunch = Math.sin((punchCycle - 18) / 6 * Math.PI) * s * 0.25;
+        }
+
         X.fillStyle = '#2A1A0E';
-        var punchOffset = (petState === 'kingkong' && pet.punchTimer % 30 < 15) ? s * 0.15 : 0;
-        X.beginPath(); X.arc(-s * 0.7, s * 0.35 - punchOffset, s * 0.16, 0, 6.28); X.fill();
-        X.beginPath(); X.arc(s * 0.7, s * 0.35 + punchOffset, s * 0.16, 0, 6.28); X.fill();
+        // Left fist with punch
+        X.beginPath(); X.arc(-s * 0.7, s * 0.35 - leftPunch, s * 0.18, 0, 6.28); X.fill();
+        // Right fist with punch
+        X.beginPath(); X.arc(s * 0.7, s * 0.35 - rightPunch, s * 0.18, 0, 6.28); X.fill();
+
+        // Punch glow effect when smashing
+        if (pet.punchTimer % 12 < 3) {
+            X.globalAlpha = 0.4;
+            var glowColor = (pet.punchTimer % 24 < 12) ? '#FFD700' : '#FF4444';
+            X.fillStyle = glowColor;
+            if (pet.punchTimer % 24 < 12) {
+                X.beginPath(); X.arc(-s * 0.7, s * 0.35 - leftPunch, s * 0.25, 0, 6.28); X.fill();
+            } else {
+                X.beginPath(); X.arc(s * 0.7, s * 0.35 - rightPunch, s * 0.25, 0, 6.28); X.fill();
+            }
+            X.globalAlpha = 1;
+        }
 
         // HEAD (yellow smiley face with brown fur)
         X.fillStyle = '#3D2914';
