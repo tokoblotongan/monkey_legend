@@ -262,10 +262,10 @@ var PET_COLLECT_RADIUS = 80;
 
 // === PET TRANSFORM (KING KONG) ===
 var petPoints = 0;
-var PET_TRANSFORM_COST = 300;  // points needed to transform
+var PET_TRANSFORM_COST = 150;  // points needed to transform
 var petState = 'normal';         // normal, transforming, kingkong, cooldown
 var petTransformTimer = 0;
-var PET_KINGKONG_DURATION = 300; // 5 detik (60fps)
+var PET_KINGKONG_DURATION = 3600; // 5 detik (60fps)
 var PET_COOLDOWN = 180;          // 3 detik cooldown
 var petGlow = 0;
 
@@ -840,11 +840,11 @@ function updatePet() {
 
     if (petState === 'transforming') {
         petTransformTimer--;
-        pet.transformScale = 1 + (1 - petTransformTimer / 60) * 1; // grow to 1.4x
+        pet.transformScale = 1 + (1 - petTransformTimer / 60) * 1; // grow to 0.7x
         if (petTransformTimer <= 0) {
             petState = 'kingkong';
             petTransformTimer = PET_KINGKONG_DURATION;
-            pet.transformScale = 1.4;
+            pet.transformScale = 0.7;
             pet.punchTimer = 0;
         }
         // Still follow player during transform
