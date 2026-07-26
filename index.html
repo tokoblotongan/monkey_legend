@@ -15,7 +15,7 @@
 
 <!-- Quest & Combo Styles -->
 <style>
-#questPanel{position:fixed;left:10px;bottom:140px;z-index:12;width:160px;background:rgba(20,5,30,0.85);backdrop-filter:blur(6px);border:1px solid rgba(255,215,0,0.25);border-radius:10px;padding:8px;color:#fff;font-family:'Nunito',sans-serif;font-size:10px}
+#questPanel{position:fixed;left:10px;bottom:180px;z-index:12;width:160px;background:rgba(20,5,30,0.85);backdrop-filter:blur(6px);border:1px solid rgba(255,215,0,0.25);border-radius:10px;padding:8px;color:#fff;font-family:'Nunito',sans-serif;font-size:10px}
 #questPanel h4{margin:0 0 6px;font-family:'Fredoka One',cursive;font-size:10px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;text-align:center}
 .quest-item{display:flex;align-items:center;gap:5px;margin-bottom:4px;padding:3px 5px;border-radius:4px;background:rgba(255,255,255,0.05)}
 .quest-item.quest-done{opacity:0.4;text-decoration:line-through}
@@ -23,6 +23,16 @@
 .quest-bar{width:40px;height:4px;background:rgba(0,0,0,0.4);border-radius:2px;overflow:hidden}
 .quest-fill{height:100%;background:linear-gradient(90deg,#FFD700,#FF8C00);border-radius:2px;transition:width 0.3s}
 .quest-pct{font-size:8px;color:var(--gold);font-weight:700;min-width:22px;text-align:right}
+/* Pet Transform Bar */
+#petBar{position:fixed;left:10px;bottom:140px;z-index:12;width:160px;background:rgba(20,5,30,0.85);backdrop-filter:blur(6px);border:1px solid rgba(255,100,0,0.3);border-radius:10px;padding:6px 8px;color:#fff;font-family:'Nunito',sans-serif;font-size:9px;display:none}
+#petBar.active{display:block}
+#petBar h4{margin:0 0 4px;font-family:'Fredoka One',cursive;font-size:9px;color:#FF8C00;text-transform:uppercase;letter-spacing:1px;text-align:center}
+.pet-bar-wrap{width:100%;height:8px;background:rgba(0,0,0,0.4);border-radius:4px;overflow:hidden}
+.pet-bar-fill{height:100%;background:linear-gradient(90deg,#FFD700,#FF4444);border-radius:4px;transition:width 0.2s}
+.pet-bar-label{text-align:center;font-size:8px;color:rgba(255,255,255,0.7);margin-top:2px}
+.pet-bar-label.ready{color:#FF4444;font-weight:700;animation:petPulse 0.5s ease-in-out infinite}
+@keyframes petPulse{0%,100%{opacity:1}50%{opacity:0.5}}
+@media(max-width:600px){#questPanel{width:130px;left:6px;bottom:160px}#petBar{width:130px;left:6px;bottom:120px}}
 #comboDisplay{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:12;text-align:center;pointer-events:none;display:none}
 .combo-count{font-family:'Fredoka One',cursive;font-size:42px;text-shadow:0 2px 10px rgba(0,0,0,0.5);animation:comboPop 0.3s ease-out}
 .combo-label{font-family:'Fredoka One',cursive;font-size:14px;margin-top:-5px;text-shadow:0 1px 5px rgba(0,0,0,0.5)}
@@ -42,6 +52,13 @@
 <div id="questPanel" style="display:none">
   <h4>🎯 Misi Hari Ini</h4>
   <div id="questList"></div>
+</div>
+
+<!-- Pet Transform Bar -->
+<div id="petBar">
+  <h4>🐵 → 🦍 KING KONG</h4>
+  <div class="pet-bar-wrap"><div class="pet-bar-fill" id="petBarFill" style="width:0%"></div></div>
+  <div class="pet-bar-label" id="petBarLabel">0 / 300</div>
 </div>
 
 <!-- Combo Display -->
@@ -112,14 +129,33 @@
 
 
 <script>
-// Show/hide quest panel based on game state
+// Show/hide quest panel & pet bar based on game state
 (function(){
   var qp = document.getElementById('questPanel');
+  var pb = document.getElementById('petBar');
+  var pbf = document.getElementById('petBarFill');
+  var pbl = document.getElementById('petBarLabel');
+
   var checkState = setInterval(function(){
     if (window.state === 'play') {
       qp.style.display = 'block';
+      pb.classList.add('active');
+
+      // Update pet bar
+      if (typeof window.petPoints !== 'undefined' && typeof window.PET_TRANSFORM_COST !== 'undefined') {
+        var pct = Math.min(100, Math.floor(window.petPoints / window.PET_TRANSFORM_COST * 100));
+        pbf.style.width = pct + '%';
+        if (window.petPoints >= window.PET_TRANSFORM_COST) {
+          pbl.textContent = 'READY! SMASH!';
+          pbl.classList.add('ready');
+        } else {
+          pbl.textContent = window.petPoints + ' / ' + window.PET_TRANSFORM_COST;
+          pbl.classList.remove('ready');
+        }
+      }
     } else {
       qp.style.display = 'none';
+      pb.classList.remove('active');
     }
   }, 200);
 })();
