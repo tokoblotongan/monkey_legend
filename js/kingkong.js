@@ -46,7 +46,7 @@ var KK = {
     spriteScale: 1.0,
 
     // Scale target: 2x Sun Wukong
-    SW_TARGET_RATIO: 2.0, // 2x dari tinggi Sun Wukong
+    SW_TARGET_RATIO: 1.4, // 2x dari tinggi Sun Wukong
 
     // Animation config (frames per state)
     anims: {
@@ -646,7 +646,7 @@ function initKingKong() {
     KK.currentFrame = 0;
     KK.stateTimer = 0;
     KK.cycleTimer = 0;
-    KK.transformScale = 2.0;
+    KK.transformScale = 1.4;
     KK.facing = 1;
     KK.walkOffset = 0;
     KK.walkPhase = 0;
