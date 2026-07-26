@@ -257,6 +257,15 @@ var pet = null;
 var PET_FOLLOW_SPEED = 0.12;
 var PET_COLLECT_RADIUS = 80;
 
+// === PET TRANSFORM (KING KONG) ===
+var petPoints = 0;
+var PET_TRANSFORM_COST = 300;  // points needed to transform
+var petState = 'normal';         // normal, transforming, kingkong, cooldown
+var petTransformTimer = 0;
+var PET_KINGKONG_DURATION = 300; // 5 detik (60fps)
+var PET_COOLDOWN = 180;          // 3 detik cooldown
+var petGlow = 0;
+
 // === COMBO SYSTEM ===
 var comboCount = 0;
 var comboTimer = 0;
@@ -286,6 +295,8 @@ window.dailyQuests= dailyQuests;
 window.boss       = boss;
 window.pet        = pet;
 window.comboCount = comboCount;
+window.petPoints  = petPoints;
+window.petState   = petState;
 window.player     = player;
 window.platforms  = platforms;
 window.ghosts     = ghosts;
@@ -785,58 +796,323 @@ function spawnPet() {
         vx: 0, vy: 0,
         size: 18,
         frame: 0,
-        animTimer: 0
+        animTimer: 0,
+        transformScale: 1,
+        punchTimer: 0
     };
+    petPoints = 0;
+    petState = 'normal';
+    petTransformTimer = 0;
     showFloatingText('Pet Monyet Bergabung!', player.x, player.y - 60, '#8BC34A');
 }
 
 function updatePet() {
     if (!pet) return;
 
-    // Follow player with delay
-    var targetX = player.x - 35 * player.facing - 25;
-    var targetY = player.y + 5;
-    pet.vx += (targetX - pet.x) * PET_FOLLOW_SPEED;
-    pet.vy += (targetY - pet.y) * PET_FOLLOW_SPEED;
-    pet.vx *= 0.85;
-    pet.vy *= 0.85;
-    pet.x += pet.vx;
-    pet.y += pet.vy;
-
-    // Auto collect coins
-    for (var i = 0; i < platforms.length; i++) {
-        var pl = platforms[i];
-        for (var j = 0; j < pl.coins.length; j++) {
-            var c = pl.coins[j];
-            if (!c.collected && Math.hypot(pet.x - c.x, pet.y - c.y) < PET_COLLECT_RADIUS) {
-                c.collected = true;
-                score += 50 * comboMultiplier;
-                sfxCoin();
-                spawnP(c.x, c.y, 3, '#FFD700', 0.6, 0.5);
-                addCombo(1);
-                updateQuest('coin', 1);
-            }
+    // === PET TRANSFORM LOGIC ===
+    if (petState === 'normal' && petPoints >= PET_TRANSFORM_COST) {
+        petState = 'transforming';
+        petTransformTimer = 60; // 1 detik transformasi
+        showFloatingText('KING KONG MODE!', player.x, player.y - 100, '#FF4444');
+        sfxQuake();
+        triggerShake(15, 30);
+        // Spawn transform particles
+        for (var i = 0; i < 30; i++) {
+            var a = rnd(0, 6.28);
+            var sp = rnd(3, 8);
+            particles.push({
+                x: pet.x, y: pet.y,
+                vx: Math.cos(a) * sp,
+                vy: Math.sin(a) * sp - rnd(2, 5),
+                life: rnd(30, 60),
+                ml: 60,
+                size: rnd(4, 10),
+                color: pick(['#FFD700', '#FF4444', '#FF8C00', '#FFF'])
+            });
         }
     }
 
-    // Animation
-    pet.animTimer++;
-    if (pet.animTimer > 8) {
-        pet.animTimer = 0;
-        pet.frame = (pet.frame + 1) % 2;
+    if (petState === 'transforming') {
+        petTransformTimer--;
+        pet.transformScale = 1 + (1 - petTransformTimer / 60) * 4; // grow to 5x
+        if (petTransformTimer <= 0) {
+            petState = 'kingkong';
+            petTransformTimer = PET_KINGKONG_DURATION;
+            pet.transformScale = 5;
+            pet.punchTimer = 0;
+        }
+        // Still follow player during transform
+        var targetX = player.x - 80 * player.facing;
+        var targetY = player.y - 20;
+        pet.x += (targetX - pet.x) * 0.15;
+        pet.y += (targetY - pet.y) * 0.15;
+        return; // skip normal logic
+    }
+
+    if (petState === 'kingkong') {
+        petTransformTimer--;
+        pet.punchTimer++;
+
+        // King Kong follows player closely
+        var targetX = player.x - 100 * player.facing;
+        var targetY = player.y - 30;
+        pet.x += (targetX - pet.x) * 0.2;
+        pet.y += (targetY - pet.y) * 0.2;
+
+        // AUTO SMASH enemies every 15 frames
+        if (pet.punchTimer % 15 === 0) {
+            var smashX = pet.x + (player.facing * 80);
+            var smashY = pet.y;
+            var smashRadius = 120;
+
+            // Visual smash effect
+            particles.push({
+                x: smashX, y: smashY,
+                vx: 0, vy: -2,
+                life: 20, ml: 20,
+                size: 40,
+                color: 'rgba(255,200,0,0.5)'
+            });
+
+            // Damage all ghosts in range
+            for (var i = 0; i < ghosts.length; i++) {
+                var g = ghosts[i];
+                if (Math.hypot(g.x - smashX, g.y - smashY) < smashRadius) {
+                    g.hp -= 5;
+                    g.hitFlash = 10;
+                    g.vx = (g.x - smashX) * 0.3;
+                    g.vy = -8;
+                    spawnP(g.x, g.y, 6, '#FFD700', 1.2);
+                }
+            }
+
+            // Screen shake
+            triggerShake(5, 8);
+            sfxHit();
+
+            // Spawn smash ring
+            particles.push({
+                x: smashX, y: smashY,
+                vx: 0, vy: 0,
+                life: 15, ml: 15,
+                size: smashRadius,
+                color: 'rgba(255,100,0,0.2)'
+            });
+        }
+
+        // Countdown warning
+        if (petTransformTimer <= 60 && petTransformTimer % 20 === 0) {
+            showFloatingText((Math.ceil(petTransformTimer/60)) + 's', pet.x, pet.y - 120, '#FF4444');
+        }
+
+        if (petTransformTimer <= 0) {
+            petState = 'cooldown';
+            petTransformTimer = PET_COOLDOWN;
+            petPoints = 0; // reset points
+            showFloatingText('Pet kembali normal...', pet.x, pet.y - 80, '#8BC34A');
+        }
+        return; // skip normal logic
+    }
+
+    if (petState === 'cooldown') {
+        petTransformTimer--;
+        pet.transformScale = 1 + (petTransformTimer / PET_COOLDOWN) * 0.5; // shrink back
+        if (petTransformTimer <= 0) {
+            petState = 'normal';
+            pet.transformScale = 1;
+        }
+    }
+
+    // === NORMAL PET LOGIC ===
+    if (petState === 'normal') {
+        // Follow player with delay
+        var targetX = player.x - 35 * player.facing - 25;
+        var targetY = player.y + 5;
+        pet.vx += (targetX - pet.x) * PET_FOLLOW_SPEED;
+        pet.vy += (targetY - pet.y) * PET_FOLLOW_SPEED;
+        pet.vx *= 0.85;
+        pet.vy *= 0.85;
+        pet.x += pet.vx;
+        pet.y += pet.vy;
+
+        // Auto collect coins - also gives pet points
+        for (var i = 0; i < platforms.length; i++) {
+            var pl = platforms[i];
+            for (var j = 0; j < pl.coins.length; j++) {
+                var c = pl.coins[j];
+                if (!c.collected && Math.hypot(pet.x - c.x, pet.y - c.y) < PET_COLLECT_RADIUS) {
+                    c.collected = true;
+                    score += 50 * comboMultiplier;
+                    petPoints += 10; // Pet gets points for collecting!
+                    sfxCoin();
+                    spawnP(c.x, c.y, 3, '#FFD700', 0.6, 0.5);
+                    addCombo(1);
+                    updateQuest('coin', 1);
+                }
+            }
+        }
+
+        // Pet also gets points when player kills ghost
+        // (handled in ghost kill section)
+
+        // Animation
+        pet.animTimer++;
+        if (pet.animTimer > 8) {
+            pet.animTimer = 0;
+            pet.frame = (pet.frame + 1) % 2;
+        }
+
+        // Glow effect when close to transform
+        petGlow = Math.min(1, petPoints / PET_TRANSFORM_COST);
     }
 }
 
 function drawPet() {
     if (!pet) return;
     var sx = pet.x - cam.x, sy = pet.y - cam.y;
-    if (sx < -50 || sx > W + 50) return;
+    if (sx < -300 || sx > W + 300) return;
 
     X.save();
     X.translate(sx, sy);
 
-    var s = pet.size;
+    var s = pet.size * pet.transformScale;
+
+    // === KING KONG MODE ===
+    if (petState === 'kingkong' || petState === 'transforming') {
+        var kkScale = pet.transformScale;
+        var shakeX = (petState === 'kingkong') ? Math.sin(frame * 0.3) * 3 : 0;
+
+        X.save();
+        X.translate(shakeX, 0);
+
+        // Shadow
+        X.globalAlpha = 0.2;
+        X.beginPath();
+        X.ellipse(0, s * 0.9, s * 0.7, s * 0.15, 0, 0, 6.28);
+        X.fillStyle = '#000'; X.fill();
+        X.globalAlpha = 1;
+
+        // LEGS (green grass-like)
+        X.fillStyle = '#228B22';
+        // Left leg
+        X.fillRect(-s * 0.45, s * 0.1, s * 0.35, s * 0.7);
+        // Right leg
+        X.fillRect(s * 0.1, s * 0.1, s * 0.35, s * 0.7);
+        // Feet
+        X.fillStyle = '#1B6B1B';
+        X.beginPath(); X.ellipse(-s * 0.27, s * 0.82, s * 0.22, s * 0.1, 0, 0, 6.28); X.fill();
+        X.beginPath(); X.ellipse(s * 0.27, s * 0.82, s * 0.22, s * 0.1, 0, 0, 6.28); X.fill();
+        // Toes
+        X.fillStyle = '#3D2914';
+        for (var t = -1; t <= 1; t++) {
+            X.beginPath(); X.arc(-s * 0.27 + t * s * 0.12, s * 0.88, s * 0.04, 0, 6.28); X.fill();
+            X.beginPath(); X.arc(s * 0.27 + t * s * 0.12, s * 0.88, s * 0.04, 0, 6.28); X.fill();
+        }
+
+        // BODY (blue muscular - six pack)
+        X.fillStyle = '#1E90FF';
+        X.fillRect(-s * 0.5, -s * 0.5, s, s * 0.7);
+
+        // Six pack abs
+        X.fillStyle = '#1873CC';
+        for (var row = 0; row < 3; row++) {
+            for (var col = 0; col < 2; col++) {
+                var ax = -s * 0.18 + col * s * 0.36;
+                var ay = -s * 0.25 + row * s * 0.18;
+                X.beginPath();
+                X.ellipse(ax, ay, s * 0.12, s * 0.07, 0, 0, 6.28);
+                X.fill();
+            }
+        }
+        // Chest pecs
+        X.fillStyle = '#1873CC';
+        X.beginPath(); X.ellipse(-s * 0.2, -s * 0.42, s * 0.22, s * 0.12, 0, 0, 6.28); X.fill();
+        X.beginPath(); X.ellipse(s * 0.2, -s * 0.42, s * 0.22, s * 0.12, 0, 0, 6.28); X.fill();
+
+        // ARM FUR (dark brown furry arms)
+        X.fillStyle = '#3D2914';
+        // Left arm
+        X.fillRect(-s * 0.85, -s * 0.45, s * 0.3, s * 0.7);
+        X.beginPath(); X.ellipse(-s * 0.7, s * 0.3, s * 0.18, s * 0.15, 0, 0, 6.28); X.fill();
+        // Right arm
+        X.fillRect(s * 0.55, -s * 0.45, s * 0.3, s * 0.7);
+        X.beginPath(); X.ellipse(s * 0.7, s * 0.3, s * 0.18, s * 0.15, 0, 0, 6.28); X.fill();
+
+        // Fists
+        X.fillStyle = '#2A1A0E';
+        var punchOffset = (petState === 'kingkong' && pet.punchTimer % 30 < 15) ? s * 0.15 : 0;
+        X.beginPath(); X.arc(-s * 0.7, s * 0.35 - punchOffset, s * 0.16, 0, 6.28); X.fill();
+        X.beginPath(); X.arc(s * 0.7, s * 0.35 + punchOffset, s * 0.16, 0, 6.28); X.fill();
+
+        // HEAD (yellow smiley face with brown fur)
+        X.fillStyle = '#3D2914';
+        X.beginPath(); X.arc(0, -s * 0.65, s * 0.42, 0, 6.28); X.fill();
+
+        // Face
+        X.fillStyle = '#FFD700';
+        X.beginPath(); X.arc(0, -s * 0.65, s * 0.32, 0, 6.28); X.fill();
+
+        // Eyes (black smiley)
+        X.fillStyle = '#000';
+        X.beginPath(); X.arc(-s * 0.1, -s * 0.7, s * 0.06, 0, 6.28); X.fill();
+        X.beginPath(); X.arc(s * 0.1, -s * 0.7, s * 0.06, 0, 6.28); X.fill();
+
+        // Smile
+        X.strokeStyle = '#000'; X.lineWidth = s * 0.025;
+        X.beginPath();
+        X.arc(0, -s * 0.62, s * 0.12, 0.2, Math.PI - 0.2);
+        X.stroke();
+
+        // Hair/fur on top
+        X.fillStyle = '#3D2914';
+        for (var h = -2; h <= 2; h++) {
+            X.beginPath();
+            X.moveTo(h * s * 0.1, -s * 0.95);
+            X.lineTo(h * s * 0.1 - s * 0.05, -s * 1.1);
+            X.lineTo(h * s * 0.1 + s * 0.05, -s * 1.1);
+            X.closePath(); X.fill();
+        }
+
+        // Glow aura when kingkong
+        if (petState === 'kingkong') {
+            var ag = X.createRadialGradient(0, 0, s * 0.3, 0, 0, s * 1.5);
+            ag.addColorStop(0, 'rgba(255,100,0,0.15)');
+            ag.addColorStop(0.5, 'rgba(255,50,0,0.08)');
+            ag.addColorStop(1, 'rgba(255,0,0,0)');
+            X.beginPath(); X.arc(0, 0, s * 1.5, 0, 6.28);
+            X.fillStyle = ag; X.fill();
+        }
+
+        X.restore();
+
+        // Timer bar above King Kong
+        if (petState === 'kingkong') {
+            var barW = s * 0.8;
+            var barH = s * 0.06;
+            var pct = petTransformTimer / PET_KINGKONG_DURATION;
+            X.fillStyle = 'rgba(0,0,0,0.6)';
+            X.fillRect(-barW/2, -s * 1.25, barW, barH);
+            X.fillStyle = pct > 0.3 ? '#FF4444' : '#FFD700';
+            X.fillRect(-barW/2, -s * 1.25, barW * pct, barH);
+            X.strokeStyle = '#FFF'; X.lineWidth = 1;
+            X.strokeRect(-barW/2, -s * 1.25, barW, barH);
+        }
+
+        X.restore();
+        return;
+    }
+
+    // === NORMAL PET (Small Monkey) ===
     var bounce = Math.sin(frame * 0.15) * 3;
+
+    // Glow when close to transform
+    if (petGlow > 0.3) {
+        var gg = X.createRadialGradient(0, 0, s * 0.5, 0, 0, s * 2);
+        gg.addColorStop(0, 'rgba(255,215,0,' + petGlow * 0.3 + ')');
+        gg.addColorStop(1, 'rgba(255,100,0,0)');
+        X.beginPath(); X.arc(0, 0, s * 2, 0, 6.28);
+        X.fillStyle = gg; X.fill();
+    }
 
     // Body
     X.fillStyle = '#8B4513';
@@ -871,6 +1147,17 @@ function drawPet() {
     X.beginPath(); X.arc(0, 0, PET_COLLECT_RADIUS, 0, 6.28);
     X.fillStyle = '#FFD700'; X.fill();
     X.globalAlpha = 1;
+
+    // Pet points bar (small, above pet)
+    if (petPoints > 0) {
+        var pw = s * 1.5;
+        var ph = 3;
+        var ppct = Math.min(1, petPoints / PET_TRANSFORM_COST);
+        X.fillStyle = 'rgba(0,0,0,0.4)';
+        X.fillRect(-pw/2, -s * 1.4, pw, ph);
+        X.fillStyle = ppct >= 1 ? '#FF4444' : '#FFD700';
+        X.fillRect(-pw/2, -s * 1.4, pw * ppct, ph);
+    }
 
     X.restore();
 }
@@ -1751,6 +2038,7 @@ function loop() {
             triggerShake(5, 10);
             addCombo(2);
             updateQuest('kill');
+            petPoints += 25; // Pet gets points for kills too!
             return false;
         }
         return Math.abs(g.x - cam.x) < W + 200;
@@ -1842,6 +2130,8 @@ function loop() {
     window.pet = pet;
     window.comboCount = comboCount;
     window.dailyQuests = dailyQuests;
+    window.petPoints = petPoints;
+    window.petState = petState;
 }
 
 // === INIT ===
