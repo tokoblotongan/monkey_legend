@@ -442,24 +442,7 @@ function triggerGameOver() {
     touchState.down = false; touchState.moveX = 0; touchState.moveY = 0;
     mouseState.leftClick = false;
 
-    // Force draw Game Over fallback di canvas (kalau CSS overlay gagal)
-    try {
-        X.clearRect(0, 0, W, H);
-        drawSky();
-        X.fillStyle = 'rgba(0,0,0,0.65)';
-        X.fillRect(0, 0, W, H);
-        X.fillStyle = '#FF4444';
-        X.font = 'bold 52px Fredoka One';
-        X.textAlign = 'center';
-        X.textBaseline = 'middle';
-        X.fillText('TUMBANG!', W/2, H/2 - 40);
-        X.fillStyle = '#FFD700';
-        X.font = 'bold 24px Nunito';
-        X.fillText('Skor: ' + score + '  |  Jarak: ' + distance + 'm', W/2, H/2 + 15);
-        X.fillStyle = 'rgba(255,255,255,0.7)';
-        X.font = '16px Nunito';
-        X.fillText('Tekan ENTER atau klik tombol Coba Lagi', W/2, H/2 + 55);
-    } catch(e) {}
+    // Canvas fallback dihapus — hanya pakai CSS overlay #gameover
 
     console.log('💀 Game Over - Skor:', score, 'Jarak:', distance);
 }
@@ -913,11 +896,11 @@ function drawPlayer() {
 
             // Render sprite lompat saat di udara
             if (isInAir && jumpSpriteReady && jumpSpriteData) {
-                var jsc = SPRITE_SCALE * 0.9;
+                var jsc = SPRITE_SCALE * 1.15;
                 var jw = jumpSpriteData.frameWidth * jsc;
                 var jh = jumpSpriteData.frameHeight * jsc;
                 var jx = -jw / 2;
-                var jy = (PH / 2) - jh + 8;
+                var jy = (PH / 2) - jh + 12;
 
                 X.save();
                 if (p.facing === -1) { X.scale(-1, 1); jx = -jx - jw; }
