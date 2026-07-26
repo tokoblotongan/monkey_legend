@@ -120,47 +120,18 @@ function loadJumpSprite() {
         var img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = function() {
-            var sw = img.naturalWidth || img.width;
-            var sh = img.naturalHeight || img.height;
-            var fw = sw / 4;
+            // Gunakan processSpriteSheet yang SAMA dengan sprite lari
+            // agar perhitungan sourceH dan frame bounds konsisten
+            var data = processSpriteSheet(img);
 
-            // Hitung max tinggi karakter per frame (trim transparent pixels)
-            var tc = document.createElement('canvas');
-            tc.width = sw;
-            tc.height = sh;
-            var tx = tc.getContext('2d');
-            tx.drawImage(img, 0, 0);
-            var imgData = tx.getImageData(0, 0, sw, sh);
-            var pixels = imgData.data;
-
-            var maxContentH = 0;
-            for (var f = 0; f < 4; f++) {
-                var fx = Math.floor(f * fw);
-                var fx2 = Math.floor((f + 1) * fw);
-                var fminY = sh, fmaxY = 0;
-                for (var px = fx; px < fx2; px++) {
-                    for (var py = 0; py < sh; py++) {
-                        var idx = (py * sw + px) * 4;
-                        if (pixels[idx + 3] > 20) {
-                            if (py < fminY) fminY = py;
-                            if (py > fmaxY) fmaxY = py;
-                        }
-                    }
-                }
-                var fh = fmaxY - fminY + 1;
-                if (fh > maxContentH) maxContentH = fh;
-            }
-            if (maxContentH < 10) maxContentH = sh; // fallback
-
-            jumpSpriteData = { 
-                img: img, 
-                frameWidth: fw, 
-                frameHeight: sh, 
-                sourceH: maxContentH,
-                frames: 4 
+            jumpSpriteData = {
+                img: img,
+                frames: data.frames,
+                sourceH: data.sourceH
             };
             jumpSpriteReady = true;
-            console.log('[JumpSprite] Lompat sprite loaded:', fw + 'x' + sh, 'contentH:', maxContentH);
+            console.log('[JumpSprite] Lompat sprite loaded, sourceH:', data.sourceH,
+                        'frame count:', data.frames.length);
             resolve();
         };
         img.onerror = function() {
@@ -931,33 +902,31 @@ function drawPlayer() {
 
             // Render sprite lompat saat di udara
             if (isInAir && jumpSpriteReady && jumpSpriteData) {
-                // Scale agar tinggi karakter lompat = tinggi karakter lari
-                // spriteData.sourceH = max tinggi karakter lari (after trim)
-                // jumpSpriteData.sourceH = max tinggi karakter lompat (after trim)
-                var targetPlayerH = spriteData.sourceH * SPRITE_SCALE;
-                var jsc = targetPlayerH / jumpSpriteData.sourceH;
-                var jw = jumpSpriteData.frameWidth * jsc;
-                var jh = targetPlayerH;
-                var jx = -jw / 2;
-                var jy = (PH / 2) - jh;
+                // Gunakan cara render yang SAMA PERSIS dengan sprite lari
+                // agar proporsi dan ukuran sama
+                var fr = jumpSpriteData.frames[currentJumpFrame];
+                if (fr) {
+                    // Scale = sprite lari scale * rasio tinggi max
+                    // agar frame paling tinggi lompat = frame paling tinggi lari
+                    var sc = SPRITE_SCALE * (spriteData.sourceH / jumpSpriteData.sourceH);
+                    var drawW = fr.w * sc;
+                    var drawH = fr.h * sc;
+                    var drawX = -fr.ox * sc;
+                    var drawY = (PH / 2) - fr.oy * sc;
 
-                X.save();
-                if (p.facing === -1) { X.scale(-1, 1); jx = -jx - jw; }
+                    X.save();
+                    if (p.facing === -1) { X.scale(-1, 1); drawX = -drawX - drawW; }
 
-                // Bayangan
-                X.save();
-                X.globalAlpha = 0.15;
-                X.beginPath(); X.ellipse(0, PH / 2 + 2, jw * 0.3, 4, 0, 0, 6.28);
-                X.fillStyle = '#000'; X.fill();
-                X.restore();
+                    // Bayangan
+                    X.save();
+                    X.globalAlpha = 0.15;
+                    X.beginPath(); X.ellipse(0, PH / 2 + 2, drawW * 0.35, 4, 0, 0, 6.28);
+                    X.fillStyle = '#000'; X.fill();
+                    X.restore();
 
-                X.drawImage(
-                    jumpSpriteData.img,
-                    currentJumpFrame * jumpSpriteData.frameWidth, 0,
-                    jumpSpriteData.frameWidth, jumpSpriteData.frameHeight,
-                    jx, jy, jw, jh
-                );
-                X.restore();
+                    X.drawImage(jumpSpriteData.img, fr.x, fr.y, fr.w, fr.h, drawX, drawY, drawW, drawH);
+                    X.restore();
+                }
             } 
             // Render sprite lari saat di tanah
             else {
