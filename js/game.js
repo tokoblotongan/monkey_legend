@@ -1738,11 +1738,14 @@ function initGame() {
 
     player = createPlayer();
     window.player = player;
-    platforms = [];
-    ghosts = [];
-    particles = [];
-    projectiles = [];
-    kameBlasts = [];
+
+    // PATCH 6: Bersihkan semua array — wajib agar restart bersih
+    platforms    = [];
+    ghosts       = [];
+    particles    = [];
+    projectiles  = [];
+    kameBlasts   = [];
+    floatingTexts = [];
     score = 0;
     distance = 0;
     frame = 0;
