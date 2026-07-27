@@ -844,7 +844,7 @@ function updatePet() {
         if (petTransformTimer <= 0) {
             petState = 'kingkong';
             petTransformTimer = PET_KINGKONG_DURATION;
-            pet.transformScale = 0.7;
+            pet.transformScale = 1.0;
             pet.punchTimer = 0;
         }
         // Still follow player during transform
