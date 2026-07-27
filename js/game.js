@@ -859,25 +859,28 @@ function updatePet() {
         petTransformTimer--;
         pet.punchTimer++;
 
-        // King Kong follows player at 3-4 steps distance (~140px)
-        var targetX = player.x - (KK.followDist * player.facing);
-        var targetY = player.y;
-        pet.x += (targetX - pet.x) * 0.18;
-        pet.y += (targetY - pet.y) * 0.18;
+        try {
+            // King Kong follows player
+            var targetX = player.x - 70;
+            var targetY = player.y;
+            pet.x += (targetX - pet.x) * 0.18;
+            pet.y += (targetY - pet.y) * 0.18;
 
-        // Sync King Kong module position
-        if (typeof KK !== 'undefined') {
-            KK.x = pet.x;
-            KK.y = pet.y;
-            KK.facing = player.facing;
-            KK.transformScale = pet.transformScale;
-            // Update King Kong animation & attacks
-            if (typeof updateKingKong === 'function') {
-                updateKingKong();
-                // Copy back position (in case KK module moved it)
-                pet.x = KK.x;
-                pet.y = KK.y;
+            // Sync King Kong module position
+            if (typeof KK !== 'undefined' && KK) {
+                KK.x = pet.x;
+                KK.y = pet.y;
+                KK.facing = player.facing || 1;
+                KK.transformScale = pet.transformScale || 1;
+
+                if (typeof updateKingKong === 'function') {
+                    updateKingKong();
+                    pet.x = KK.x;
+                    pet.y = KK.y;
+                }
             }
+        } catch (e) {
+            console.warn('[Game] KingKong update error:', e);
         }
 
         // Countdown warning
@@ -955,17 +958,18 @@ function drawPet() {
 
     // === KING KONG MODE ===
     if (petState === 'kingkong' || petState === 'transforming') {
-        // Gunakan sprite King Kong jika tersedia
-        if (typeof drawKingKong === 'function' && KK && KK.ready) {
-            // Sync posisi KK dengan pet
-            KK.x = pet.x;
-            KK.y = pet.y;
-            KK.facing = player.facing;
-            KK.transformScale = pet.transformScale;
-            drawKingKong();
-        } else {
-            // Fallback: gambar manual (simplified)
-            drawKingKongFallback();
+        try {
+            if (typeof drawKingKong === 'function' && typeof KK !== 'undefined' && KK) {
+                KK.x = pet.x;
+                KK.y = pet.y;
+                KK.facing = player.facing || 1;
+                KK.transformScale = pet.transformScale || 1;
+                drawKingKong();
+            } else if (typeof drawKingKongFallback === 'function') {
+                drawKingKongFallback();
+            }
+        } catch (e) {
+            console.warn('[Game] KingKong draw error:', e);
         }
         return;
     }
@@ -1786,7 +1790,9 @@ function initGame() {
     spawnPet();
 
     // Reset King Kong
-    if (typeof initKingKong === 'function') initKingKong();
+    if (typeof initKingKong === 'function') {
+        try { initKingKong(); } catch(e) { console.warn('initKingKong error:', e); }
+    }
 
     platforms.push(makePlat(-100, H - 35, 600, 'ground'));
     genX = 500;
@@ -1824,6 +1830,11 @@ function initGame() {
     
     gameOverTriggered = false;
     window.gameOverTriggered = false;
+
+    // Reset King Kong juga
+    if (typeof initKingKong === 'function') {
+        try { initKingKong(); } catch(e) {}
+    }
 
     console.log('✅ initGame() selesai');
 }
