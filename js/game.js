@@ -808,9 +808,8 @@ function spawnPet() {
     petTransformTimer = 0;
     showFloatingText('Pet Monyet Bergabung!', player.x, player.y - 60, '#8BC34A');
 
-    // Init King Kong
     if (typeof initKingKong === 'function') {
-        try { initKingKong(); } catch(e) {}
+        try { initKingKong(); } catch(e) { console.warn('[Game] initKingKong error:', e); }
     }
 }
 
@@ -948,9 +947,15 @@ function drawPet() {
     var s = pet.size * pet.transformScale;
 
     // === KING KONG MODE ===
-    // King Kong sudah digambar di loop utama, jangan gambar ulang di sini
     if (petState === 'kingkong' || petState === 'transforming') {
-        return;  // skip draw pet biasa
+        try {
+            if (typeof drawKingKong === 'function') {
+                drawKingKong();
+            }
+        } catch (e) {
+            console.warn('[Game] drawKingKong error:', e);
+        }
+        return;
     }
 
     // === NORMAL PET (Small Monkey) ===
@@ -1842,10 +1847,6 @@ function loop() {
 
     // ===== SELALU BERSIHKAN CANVAS =====
     X.clearRect(0, 0, W, H);
-    X.save();
-    X.setTransform(1, 0, 0, 1, 0, 0);  // reset transform
-    X.clearRect(0, 0, W, H);
-    X.restore();
     drawSky();
 
     // ===== HANYA JALANKAN LOGIC JIKA STATE 'play' =====
@@ -1965,10 +1966,6 @@ function loop() {
         drawBoss();
         drawPlayer();
         drawPet();
-        // Draw King Kong (hanya saat kingkong mode)
-        if ((petState === 'kingkong' || petState === 'transforming') && typeof drawKingKong === 'function') {
-            try { drawKingKong(); } catch(e) {}
-        }
         drawFloatingTexts();
         for (var i = 0; i < particles.length; i++) {
             var p = particles[i], a = p.life / p.ml;
