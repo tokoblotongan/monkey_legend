@@ -808,8 +808,10 @@ function spawnPet() {
     petTransformTimer = 0;
     showFloatingText('Pet Monyet Bergabung!', player.x, player.y - 60, '#8BC34A');
 
-    // Init King Kong position
-    if (typeof initKingKong === 'function') initKingKong();
+    // Init King Kong
+    if (typeof initKingKong === 'function') {
+        try { initKingKong(); } catch(e) {}
+    }
 }
 
 function updatePet() {
@@ -860,24 +862,13 @@ function updatePet() {
         pet.punchTimer++;
 
         try {
-            // King Kong follows player
-            var targetX = player.x - 70;
-            var targetY = player.y;
-            pet.x += (targetX - pet.x) * 0.18;
-            pet.y += (targetY - pet.y) * 0.18;
-
-            // Sync King Kong module position
-            if (typeof KK !== 'undefined' && KK) {
-                KK.x = pet.x;
-                KK.y = pet.y;
-                KK.facing = player.facing || 1;
-                KK.transformScale = pet.transformScale || 1;
-
-                if (typeof updateKingKong === 'function') {
-                    updateKingKong();
-                    pet.x = KK.x;
-                    pet.y = KK.y;
-                }
+            // Sync pet position ke KK module
+            // KK.updateKingKong() akan menghitung posisi sendiri
+            if (typeof KK !== 'undefined' && KK && typeof updateKingKong === 'function') {
+                updateKingKong();
+                // Copy posisi dari KK ke pet (untuk kompatibilitas)
+                pet.x = KK.x;
+                pet.y = KK.y;
             }
         } catch (e) {
             console.warn('[Game] KingKong update error:', e);
@@ -959,14 +950,8 @@ function drawPet() {
     // === KING KONG MODE ===
     if (petState === 'kingkong' || petState === 'transforming') {
         try {
-            if (typeof drawKingKong === 'function' && typeof KK !== 'undefined' && KK) {
-                KK.x = pet.x;
-                KK.y = pet.y;
-                KK.facing = player.facing || 1;
-                KK.transformScale = pet.transformScale || 1;
+            if (typeof drawKingKong === 'function') {
                 drawKingKong();
-            } else if (typeof drawKingKongFallback === 'function') {
-                drawKingKongFallback();
             }
         } catch (e) {
             console.warn('[Game] KingKong draw error:', e);
@@ -1793,6 +1778,11 @@ function initGame() {
     if (typeof initKingKong === 'function') {
         try { initKingKong(); } catch(e) { console.warn('initKingKong error:', e); }
     }
+
+    // Reset petPoints & petState
+    petPoints = 0;
+    petState = 'normal';
+    petTransformTimer = 0;
 
     platforms.push(makePlat(-100, H - 35, 600, 'ground'));
     genX = 500;
