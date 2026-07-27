@@ -948,15 +948,9 @@ function drawPet() {
     var s = pet.size * pet.transformScale;
 
     // === KING KONG MODE ===
+    // King Kong sudah digambar di loop utama, jangan gambar ulang di sini
     if (petState === 'kingkong' || petState === 'transforming') {
-        try {
-            if (typeof drawKingKong === 'function') {
-                drawKingKong();
-            }
-        } catch (e) {
-            console.warn('[Game] KingKong draw error:', e);
-        }
-        return;
+        return;  // skip draw pet biasa
     }
 
     // === NORMAL PET (Small Monkey) ===
@@ -1821,9 +1815,19 @@ function initGame() {
     gameOverTriggered = false;
     window.gameOverTriggered = false;
 
-    // Reset King Kong juga
+    // Reset King Kong
     if (typeof initKingKong === 'function') {
         try { initKingKong(); } catch(e) {}
+    }
+
+    // Reset pet state
+    petPoints = 0;
+    petState = 'normal';
+    petTransformTimer = 0;
+    if (pet) {
+        pet.x = player.x - 40;
+        pet.y = player.y;
+        pet.transformScale = 1;
     }
 
     console.log('✅ initGame() selesai');
@@ -1836,8 +1840,12 @@ function loop() {
     animationId = requestAnimationFrame(loop);
     window.animationId = animationId;
 
-    // ===== SELALU BERSIHKAN & GAMBAR BACKGROUND =====
+    // ===== SELALU BERSIHKAN CANVAS =====
     X.clearRect(0, 0, W, H);
+    X.save();
+    X.setTransform(1, 0, 0, 1, 0, 0);  // reset transform
+    X.clearRect(0, 0, W, H);
+    X.restore();
     drawSky();
 
     // ===== HANYA JALANKAN LOGIC JIKA STATE 'play' =====
@@ -1957,6 +1965,10 @@ function loop() {
         drawBoss();
         drawPlayer();
         drawPet();
+        // Draw King Kong (hanya saat kingkong mode)
+        if ((petState === 'kingkong' || petState === 'transforming') && typeof drawKingKong === 'function') {
+            try { drawKingKong(); } catch(e) {}
+        }
         drawFloatingTexts();
         for (var i = 0; i < particles.length; i++) {
             var p = particles[i], a = p.life / p.ml;
