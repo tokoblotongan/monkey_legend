@@ -1,6 +1,7 @@
 // ============================================
-// KING KONG SPRITE MODULE — MINIMAL SAFE VERSION
-// Fokus: posisi benar, tidak jatuh, tidak rusak
+// KING KONG SPRITE MODULE — FIXED VERSION
+// Skala: ~80px tinggi (sejajar Sun Wukong)
+// Posisi: di tanah, tidak ikut lompat
 // ============================================
 
 var KK = {
@@ -10,30 +11,30 @@ var KK = {
     sourceH: 0,
     url: 'assets/images/Kingkong brutal.png',
 
-    // Position
     x: 0,
     y: 0,
     facing: 1,
 
-    // State
     state: 'idle',
     animTimer: 0,
     currentFrame: 0,
     stateTimer: 0,
     cycleTimer: 0,
 
-    // Config
     followDist: 70,
-    SW_TARGET_RATIO: 1.0,
 
-    // Debug
-    debug: true  // aktifkan untuk lihat posisi di console
+    // Skala dihitung dari tinggi gambar asli
+    // Target: 80px tinggi (sebanding Sun Wukong ~70-95px)
+    targetHeight: 80,
+    scale: 1.0,
+
+    debug: false
 };
 
 window.KK = KK;
 
 // ============================================
-// LOAD SPRITE — SAFE
+// LOAD SPRITE
 // ============================================
 function loadKingKongSprite() {
     return new Promise(function(resolve) {
@@ -43,8 +44,9 @@ function loadKingKongSprite() {
             try {
                 var sw = img.naturalWidth || img.width || 0;
                 var sh = img.naturalHeight || img.height || 0;
+
                 if (sw < 40 || sh < 40) {
-                    console.warn('[KingKong] Gambar terlalu kecil:', sw, 'x', sh);
+                    console.warn('[KingKong] Gambar terlalu kecil');
                     resolve();
                     return;
                 }
@@ -60,14 +62,18 @@ function loadKingKongSprite() {
                         w: frameW,
                         h: sh,
                         ox: frameW / 2,
-                        oy: sh  // anchor di BAWAH (kaki)
+                        oy: sh
                     });
                 }
 
                 KK.img = img;
                 KK.sourceH = sh;
+                // Hitung skala: target 80px / tinggi gambar asli
+                KK.scale = KK.targetHeight / sh;
                 KK.ready = true;
-                console.log('[KingKong] Sprite OK. frames:', KK.frames.length, 'size:', sw + 'x' + sh);
+
+                console.log('[KingKong] Loaded. imgSize:', sw + 'x' + sh, 
+                            'frameW:', frameW, 'scale:', KK.scale.toFixed(3));
             } catch (e) {
                 console.warn('[KingKong] Load error:', e);
             }
@@ -84,7 +90,7 @@ function loadKingKongSprite() {
 window.loadKingKongSprite = loadKingKongSprite;
 
 // ============================================
-// UPDATE — POSISI SANGAT SEDERHANA
+// UPDATE — POSISI DI TANAH
 // ============================================
 function updateKingKong() {
     if (!window.player) return;
@@ -92,14 +98,17 @@ function updateKingKong() {
 
     try {
         var p = window.player;
+        var H = window.H || innerHeight;
 
-        // POSISI: di belakang player, SEJAJAR TANAH
-        // p.y adalah CENTER player. Kaki player = p.y + PH/2
-        // King Kong anchor di oy (bottom), jadi KK.y = posisi kaki player
-        var playerFootY = p.y + ((window.PH || 38) / 2);
-
+        // X: di belakang player
         KK.x = p.x - (KK.followDist * (p.facing || 1));
-        KK.y = playerFootY;  // SEJAJAR KAKI PLAYER
+
+        // Y: di TANAH (ground), tidak ikut lompat player
+        // Ground Y = H - 35 (dari makePlat di game.js)
+        // Kaki King Kong = groundY
+        var groundY = H - 35;
+        KK.y = groundY;
+
         KK.facing = p.facing || 1;
 
         // Animation cycle (20 detik = 1200 frames)
@@ -120,13 +129,6 @@ function updateKingKong() {
         else if (KK.state === 'punch_left') KK.currentFrame = 1;
         else if (KK.state === 'chest_beat') KK.currentFrame = (Math.floor(KK.animTimer / 8) % 2 === 0) ? 2 : 3;
 
-        // Logging posisi
-        if (KK.debug && KK.animTimer % 60 === 0) {
-            console.log('[KingKong] pos:', Math.round(KK.x), Math.round(KK.y), 
-                        'state:', KK.state, 'frame:', KK.currentFrame,
-                        'player:', Math.round(p.x), Math.round(p.y));
-        }
-
     } catch (e) {
         console.warn('[KingKong] Update error:', e);
     }
@@ -135,7 +137,7 @@ function updateKingKong() {
 window.updateKingKong = updateKingKong;
 
 // ============================================
-// DRAW — SANGAT SEDERHANA, TIDAK RUSAK
+// DRAW — SKALA DINAMIS, POSISI TANAH
 // ============================================
 function drawKingKong() {
     if (!KK) return;
@@ -150,22 +152,21 @@ function drawKingKong() {
         var sy = kk.y - camY;
 
         // Cek viewport
-        if (sx < -200 || sx > W + 200) return;
+        if (sx < -300 || sx > W + 300) return;
 
-        // === FALLBACK DRAW (selalu jalan) ===
+        // FALLBACK
         if (!kk.ready || !kk.img || !kk.frames[kk.currentFrame]) {
             drawKingKongFallback(sx, sy);
             return;
         }
 
-        // === SPRITE DRAW ===
         var fr = kk.frames[kk.currentFrame];
-        var sc = 1.0;  // skala tetap 1.0 dulu
+        var sc = kk.scale;  // skala dinamis dari tinggi gambar
 
         var drawW = fr.w * sc;
         var drawH = fr.h * sc;
         var drawX = -fr.ox * sc;
-        var drawY = -fr.oy * sc;  // anchor di BAWAH, jadi naik ke atas
+        var drawY = -fr.oy * sc;  // anchor di BAWAH gambar
 
         window.X.save();
         window.X.translate(sx, sy);
@@ -176,11 +177,13 @@ function drawKingKong() {
             drawX = -drawX - drawW;
         }
 
-        // Draw sprite
+        // Draw sprite — PASTIKAN parameter benar
         window.X.drawImage(
-            kk.img,
-            fr.x, fr.y, fr.w, fr.h,
-            drawX, drawY, drawW, drawH
+            kk.img,           // sumber gambar
+            fr.x, fr.y,       // sumber x, y (offset frame)
+            fr.w, fr.h,       // sumber width, height (ukuran frame)
+            drawX, drawY,     // target x, y (di canvas, relatif translate)
+            drawW, drawH      // target width, height (skala)
         );
 
         // Debug bounds
@@ -204,14 +207,13 @@ function drawKingKong() {
 window.drawKingKong = drawKingKong;
 
 // ============================================
-// FALLBACK — GAMBAR SEDERHANA
+// FALLBACK
 // ============================================
 function drawKingKongFallback(sx, sy) {
     try {
         window.X.save();
         window.X.translate(sx, sy);
 
-        // Shadow
         window.X.globalAlpha = 0.3;
         window.X.beginPath();
         window.X.ellipse(0, 2, 20, 5, 0, 0, 6.28);
@@ -219,17 +221,12 @@ function drawKingKongFallback(sx, sy) {
         window.X.fill();
         window.X.globalAlpha = 1;
 
-        // Body
         window.X.fillStyle = '#4A3728';
         window.X.fillRect(-15, -40, 30, 40);
-
-        // Head
         window.X.fillStyle = '#5C4033';
         window.X.beginPath();
         window.X.arc(0, -45, 12, 0, 6.28);
         window.X.fill();
-
-        // Red eyes
         window.X.fillStyle = '#FF0000';
         window.X.beginPath();
         window.X.arc(-5, -48, 3, 0, 6.28);
@@ -237,12 +234,6 @@ function drawKingKongFallback(sx, sy) {
         window.X.beginPath();
         window.X.arc(5, -48, 3, 0, 6.28);
         window.X.fill();
-
-        // Label
-        window.X.fillStyle = '#FFF';
-        window.X.font = '10px sans-serif';
-        window.X.textAlign = 'center';
-        window.X.fillText('KING KONG', 0, -60);
 
         window.X.restore();
     } catch (e) {}
@@ -254,18 +245,17 @@ function drawKingKongFallback(sx, sy) {
 function initKingKong() {
     if (!KK) return;
     var px = (window.player && window.player.x) ? window.player.x : 200;
-    var py = (window.player && window.player.y) ? window.player.y : 400;
-    var footY = py + ((window.PH || 38) / 2);
+    var H = window.H || innerHeight;
 
     KK.x = px - 70;
-    KK.y = footY;
+    KK.y = H - 35;  // di tanah
     KK.facing = 1;
     KK.state = 'idle';
     KK.currentFrame = 2;
     KK.animTimer = 0;
     KK.cycleTimer = 0;
 
-    console.log('[KingKong] Init at', Math.round(KK.x), Math.round(KK.y));
+    console.log('[KingKong] Init at', Math.round(KK.x), Math.round(KK.y), 'scale:', KK.scale.toFixed(3));
 }
 
 window.initKingKong = initKingKong;
