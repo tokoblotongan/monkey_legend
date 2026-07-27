@@ -47,7 +47,7 @@ var KK = {
     debug: false,         // true = gambar kotak merah di bounds
 
     // Scale target: 0.7x Sun Wukong (kecil)
-    SW_TARGET_RATIO: 0.7
+    SW_TARGET_RATIO: 1.0
 
     // Animation config (frames per state)
     anims: {
@@ -103,23 +103,26 @@ function processKingKongSheet(img) {
     var imgData = tx.getImageData(0, 0, sw, sh);
     var pixels = imgData.data;
 
-    // === SOLUSI: Bagi rata 4 frame horizontal ===
+    // === Bagi rata 4 frame horizontal ===
     var frameW = Math.floor(sw / 4);
     var frames = [];
     var globalMaxH = 0;
 
     for (var f = 0; f < 4; f++) {
-        var startX = f * frameW;
-        var endX = (f === 3) ? sw : (f + 1) * frameW;
+        var segStart = f * frameW;
+        var segEnd = (f === 3) ? sw : (f + 1) * frameW;
 
-        // Trim vertikal: cari minY dan maxY yang punya pixel solid
+        // === TRIM HORIZONTAL: cari minX, maxX dalam segment ===
+        var minX = segEnd, maxX = segStart;
         var minY = sh, maxY = 0;
         var found = false;
 
-        for (var py = 0; py < sh; py++) {
-            for (var px = startX; px < endX; px++) {
+        for (var px = segStart; px < segEnd; px++) {
+            for (var py = 0; py < sh; py++) {
                 var idx = (py * sw + px) * 4;
-                if (pixels[idx + 3] > 80) { // threshold lebih tinggi, hapus glow tipis
+                if (pixels[idx + 3] > 60) {
+                    if (px < minX) minX = px;
+                    if (px > maxX) maxX = px;
                     if (py < minY) minY = py;
                     if (py > maxY) maxY = py;
                     found = true;
@@ -128,35 +131,39 @@ function processKingKongSheet(img) {
         }
 
         if (!found) {
-            // Frame kosong? pakai tengah-tengah gambar
+            // Frame kosong — fallback ke tengah segment
+            minX = segStart + Math.floor(frameW * 0.1);
+            maxX = segStart + Math.floor(frameW * 0.9);
             minY = Math.floor(sh * 0.1);
             maxY = Math.floor(sh * 0.9);
         }
 
-        // Tambah padding 2px biar aman
+        // Padding 2px biar aman
+        minX = Math.max(segStart, minX - 2);
+        maxX = Math.min(segEnd - 1, maxX + 2);
         minY = Math.max(0, minY - 2);
         maxY = Math.min(sh - 1, maxY + 2);
 
+        var fw2 = maxX - minX + 1;
         var fh = maxY - minY + 1;
         if (fh > globalMaxH) globalMaxH = fh;
 
         // Anchor: center X, bottom Y (kaki)
-        var ox = frameW / 2;
-        var oy = fh; // anchor di bottom
+        var ox = fw2 / 2;
+        var oy = fh;
 
         frames.push({
-            x: startX,
+            x: minX,
             y: minY,
-            w: frameW,
+            w: fw2,
             h: fh,
             ox: ox,
             oy: oy,
-            origX: startX,
-            origEndX: endX
+            origX: segStart,
+            origEndX: segEnd
         });
     }
 
-    // sourceH = tinggi maksimum setelah trim (konsisten semua frame)
     return { frames: frames, sourceH: globalMaxH };
 }
 
@@ -191,10 +198,10 @@ function updateKingKong() {
     kk.spriteScale = calcKKScale();
 
     // === POSISI DASAR: 3-4 langkah di belakang Sun Wukong ===
-    // baseY = kaki player (p.y adalah center, PH/2 = setengah tinggi)
-    var playerFootY = p.y + (window.PH || 38) / 2;
+    // baseY = center player (sama seperti Sun Wukong)
+    // drawY akan menangani offset ke kaki
     var baseX = p.x - (kk.followDist * p.facing);
-    var baseY = playerFootY;
+    var baseY = p.y;
 
     // === GERAKAN BRUTAL: kanan-kiri + marah ===
     kk.walkPhase += 0.08;
@@ -583,7 +590,7 @@ function drawKingKongFallback() {
     var kk = KK;
     var sx = kk.x - window.cam.x;
     var sy = kk.y - window.cam.y;
-    var s = 28 * kk.transformScale;
+    var s = 40 * kk.transformScale;
 
     window.X.save();
     window.X.translate(sx, sy);
@@ -644,7 +651,7 @@ function initKingKong() {
     KK.currentFrame = 0;
     KK.stateTimer = 0;
     KK.cycleTimer = 0;
-    KK.transformScale = 0.7;
+    KK.transformScale = 1.0;
     KK.facing = 1;
     KK.walkOffset = 0;
     KK.walkPhase = 0;
