@@ -861,11 +861,16 @@ function updatePet() {
         pet.punchTimer++;
 
         try {
-            // Sync pet position ke KK module
-            // KK.updateKingKong() akan menghitung posisi sendiri
             if (typeof KK !== 'undefined' && KK && typeof updateKingKong === 'function') {
                 updateKingKong();
-                // Copy posisi dari KK ke pet (untuk kompatibilitas)
+                // Setelah updateKingKong(), paksa KK.y ke ground level
+                // agar KK tidak ikut melayang saat Wukong naik awan.
+                // Ground = H - PLAT_H - (tinggi KK di layar / 2)
+                // Kita pakai H - 35 (tinggi ground platform dari initGame)
+                var groundY = H - 35;
+                KK.y = groundY;
+
+                // Copy posisi ke pet untuk kompatibilitas kode lain
                 pet.x = KK.x;
                 pet.y = KK.y;
             }
@@ -947,7 +952,12 @@ function drawPet() {
     var s = pet.size * pet.transformScale;
 
     // === KING KONG MODE ===
+    // BUGFIX: drawKingKong() sudah punya X.save/translate sendiri (menghitung
+    // posisi dari KK.x/KK.y dan cam). Jika dipanggil di dalam X.translate(sx,sy)
+    // milik drawPet, posisi KK kena double-offset → muncul di luar layar.
+    // Solusi: restore context drawPet dulu, baru panggil drawKingKong.
     if (petState === 'kingkong' || petState === 'transforming') {
+        X.restore(); // tutup X.save() + X.translate(sx,sy) di atas
         try {
             if (typeof drawKingKong === 'function') {
                 drawKingKong();
@@ -955,7 +965,7 @@ function drawPet() {
         } catch (e) {
             console.warn('[Game] drawKingKong error:', e);
         }
-        return;
+        return; // jangan X.restore() lagi karena sudah di-restore
     }
 
     // === NORMAL PET (Small Monkey) ===
@@ -1738,14 +1748,11 @@ function initGame() {
 
     player = createPlayer();
     window.player = player;
-
-    // PATCH 6: Bersihkan semua array — wajib agar restart bersih
-    platforms    = [];
-    ghosts       = [];
-    particles    = [];
-    projectiles  = [];
-    kameBlasts   = [];
-    floatingTexts = [];
+    platforms = [];
+    ghosts = [];
+    particles = [];
+    projectiles = [];
+    kameBlasts = [];
     score = 0;
     distance = 0;
     frame = 0;
