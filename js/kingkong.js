@@ -69,17 +69,33 @@ function loadKingKongSprite() {
         var img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = function() {
-            var data = processKingKongSheet(img);
-            KK.img = img;
-            KK.frames = data.frames;
-            KK.sourceH = data.sourceH;
-            KK.ready = true;
-            KK.spriteScale = calcKKScale();
-            console.log('[KingKong] Sprite loaded, frames:', data.frames.length, 'sourceH:', data.sourceH, 'scale:', KK.spriteScale);
+            try {
+                var sw = img.naturalWidth || img.width || 0;
+                var sh = img.naturalHeight || img.height || 0;
+                if (sw === 0 || sh === 0) {
+                    console.warn('[KingKong] Gambar kosong, pakai fallback');
+                    resolve();
+                    return;
+                }
+                var data = processKingKongSheet(img);
+                if (!data || !data.frames || data.frames.length === 0) {
+                    console.warn('[KingKong] Frame kosong, pakai fallback');
+                    resolve();
+                    return;
+                }
+                KK.img = img;
+                KK.frames = data.frames;
+                KK.sourceH = data.sourceH;
+                KK.ready = true;
+                KK.spriteScale = calcKKScale();
+                console.log('[KingKong] Sprite loaded, frames:', data.frames.length, 'sourceH:', data.sourceH, 'scale:', KK.spriteScale);
+            } catch (e) {
+                console.warn('[KingKong] Error process sprite:', e);
+            }
             resolve();
         };
         img.onerror = function() {
-            console.warn('[KingKong] Gagal load sprite');
+            console.warn('[KingKong] Gagal load sprite dari URL');
             resolve();
         };
         img.src = KK.url;
@@ -92,19 +108,37 @@ window.loadKingKongSprite = loadKingKongSprite;
 // PROCESS SPRITE SHEET (4 frame horizontal)
 // ============================================
 function processKingKongSheet(img) {
-    var sw = img.naturalWidth || img.width;
-    var sh = img.naturalHeight || img.height;
+    var sw = img.naturalWidth || img.width || 0;
+    var sh = img.naturalHeight || img.height || 0;
+
+    if (sw === 0 || sh === 0) {
+        console.warn('[KingKong] processKingKongSheet: ukuran gambar 0');
+        return { frames: [], sourceH: 1 };
+    }
 
     var tc = document.createElement('canvas');
     tc.width = sw;
     tc.height = sh;
     var tx = tc.getContext('2d');
     tx.drawImage(img, 0, 0);
-    var imgData = tx.getImageData(0, 0, sw, sh);
+
+    var imgData;
+    try {
+        imgData = tx.getImageData(0, 0, sw, sh);
+    } catch (e) {
+        console.warn('[KingKong] getImageData error:', e);
+        return { frames: [], sourceH: 1 };
+    }
+
     var pixels = imgData.data;
 
     // === Bagi rata 4 frame horizontal ===
     var frameW = Math.floor(sw / 4);
+    if (frameW < 10) {
+        console.warn('[KingKong] frameW terlalu kecil:', frameW);
+        return { frames: [], sourceH: 1 };
+    }
+
     var frames = [];
     var globalMaxH = 0;
 
@@ -112,12 +146,11 @@ function processKingKongSheet(img) {
         var segStart = f * frameW;
         var segEnd = (f === 3) ? sw : (f + 1) * frameW;
 
-        // === TRIM HORIZONTAL: cari minX, maxX dalam segment ===
         var minX = segEnd, maxX = segStart;
         var minY = sh, maxY = 0;
         var found = false;
 
-        for (var px = segStart; px < segEnd; px++) {
+        for (var px = segStart; px < segEnd && px < sw; px++) {
             for (var py = 0; py < sh; py++) {
                 var idx = (py * sw + px) * 4;
                 if (pixels[idx + 3] > 60) {
@@ -131,38 +164,32 @@ function processKingKongSheet(img) {
         }
 
         if (!found) {
-            // Frame kosong — fallback ke tengah segment
-            minX = segStart + Math.floor(frameW * 0.1);
-            maxX = segStart + Math.floor(frameW * 0.9);
-            minY = Math.floor(sh * 0.1);
-            maxY = Math.floor(sh * 0.9);
+            minX = segStart;
+            maxX = segEnd - 1;
+            minY = 0;
+            maxY = sh - 1;
         }
 
-        // Padding 2px biar aman
-        minX = Math.max(segStart, minX - 2);
-        maxX = Math.min(segEnd - 1, maxX + 2);
-        minY = Math.max(0, minY - 2);
-        maxY = Math.min(sh - 1, maxY + 2);
+        minX = Math.max(segStart, minX - 1);
+        maxX = Math.min(segEnd - 1, maxX + 1);
+        minY = Math.max(0, minY - 1);
+        maxY = Math.min(sh - 1, maxY + 1);
 
         var fw2 = maxX - minX + 1;
         var fh = maxY - minY + 1;
         if (fh > globalMaxH) globalMaxH = fh;
 
-        // Anchor: center X, bottom Y (kaki)
         var ox = fw2 / 2;
         var oy = fh;
 
         frames.push({
-            x: minX,
-            y: minY,
-            w: fw2,
-            h: fh,
-            ox: ox,
-            oy: oy,
-            origX: segStart,
-            origEndX: segEnd
+            x: minX, y: minY, w: fw2, h: fh,
+            ox: ox, oy: oy,
+            origX: segStart, origEndX: segEnd
         });
     }
+
+    if (globalMaxH === 0) globalMaxH = 1;
 
     return { frames: frames, sourceH: globalMaxH };
 }
@@ -171,14 +198,14 @@ function processKingKongSheet(img) {
 // CALCULATE SCALE — 2x Sun Wukong
 // ============================================
 function calcKKScale() {
-    if (!KK.sourceH) return 1.0;
+    if (!KK.sourceH || KK.sourceH <= 0) return 1.0;
 
-    // Sun Wukong height reference (dari sprite lari)
+    // Sun Wukong height reference
     var swHeight = (window.spriteData && window.spriteData.sourceH) ? window.spriteData.sourceH : 80;
     var swScale = (typeof SPRITE_SCALE !== 'undefined') ? SPRITE_SCALE : 1.0;
     var swPixelHeight = swHeight * swScale;
 
-    // Target: 2x tinggi Sun Wukong
+    // Target: ratio dari tinggi Sun Wukong
     var targetH = swPixelHeight * KK.SW_TARGET_RATIO;
     var rawScale = targetH / KK.sourceH;
 
@@ -190,18 +217,20 @@ function calcKKScale() {
 // ============================================
 function updateKingKong() {
     if (!window.player) return;
+    if (!KK) return;
 
-    var p = window.player;
-    var kk = KK;
+    try {
+        var p = window.player;
+        var kk = KK;
 
-    // Update scale responsive
-    kk.spriteScale = calcKKScale();
+        // Update scale responsive
+        if (typeof calcKKScale === 'function') {
+            kk.spriteScale = calcKKScale();
+        }
 
-    // === POSISI DASAR: 3-4 langkah di belakang Sun Wukong ===
-    // baseY = center player (sama seperti Sun Wukong)
-    // drawY akan menangani offset ke kaki
-    var baseX = p.x - (kk.followDist * p.facing);
-    var baseY = p.y;
+        // === POSISI DASAR: di belakang Sun Wukong ===
+        var baseX = p.x - (kk.followDist * p.facing);
+        var baseY = p.y;
 
     // === GERAKAN BRUTAL: kanan-kiri + marah ===
     kk.walkPhase += 0.08;
@@ -295,9 +324,12 @@ function updateKingKong() {
         spawnAngryParticles();
     }
 
-    // Update transform scale (2x target)
-    var targetScale = isAttacking ? 2.1 : 2.0;
+    // Update transform scale
+    var targetScale = isAttacking ? 1.1 : 1.0;
     kk.transformScale += (targetScale - kk.transformScale) * 0.08;
+    } catch (e) {
+        console.warn('[KingKong] updateKingKong error:', e);
+    }
 }
 
 window.updateKingKong = updateKingKong;
@@ -452,25 +484,23 @@ function spawnAngryParticles() {
 // DRAW KING KONG SPRITE
 // ============================================
 function drawKingKong() {
-    if (!KK.ready || !KK.img) {
-        drawKingKongFallback();
-        return;
-    }
+    if (!KK) { drawKingKongFallback(); return; }
+    if (!KK.ready || !KK.img) { drawKingKongFallback(); return; }
 
+    try {
     var kk = KK;
-    var sx = kk.x - window.cam.x;
-    var sy = kk.y - window.cam.y;
+    var sx = kk.x - (window.cam ? window.cam.x : 0);
+    var sy = kk.y - (window.cam ? window.cam.y : 0);
 
-    if (sx < -300 || sx > window.W + 300) return;
+    if (!window.W || sx < -300 || sx > window.W + 300) return;
 
     var anim = kk.anims[kk.state];
+    if (!anim || !anim.frames) { drawKingKongFallback(); return; }
+
     var frameIdx = anim.frames[kk.currentFrame % anim.frames.length];
     var fr = kk.frames[frameIdx];
 
-    if (!fr) {
-        drawKingKongFallback();
-        return;
-    }
+    if (!fr) { drawKingKongFallback(); return; }
 
     var sc = kk.spriteScale * kk.transformScale;
     var drawW = fr.w * sc;
@@ -550,6 +580,10 @@ function drawKingKong() {
     }
 
     window.X.restore();
+
+    } catch (e) {
+        console.warn('[KingKong] drawKingKong error:', e);
+    }
 
     // === STATE LABEL DI ATAS KING KONG ===
     var labelText = '';
@@ -642,8 +676,14 @@ function drawKingKongFallback() {
 // INIT KING KONG
 // ============================================
 function initKingKong() {
-    KK.x = window.player ? window.player.x - 140 : 60;
-    KK.y = window.player ? window.player.y : window.H - 200;
+    if (!KK) {
+        console.warn('[KingKong] KK object tidak ada');
+        return;
+    }
+    var px = (window.player && window.player.x) ? window.player.x : 200;
+    var py = (window.player && window.player.y) ? window.player.y : (window.H ? window.H - 200 : 400);
+    KK.x = px - KK.followDist;
+    KK.y = py;
     KK.vx = 0;
     KK.vy = 0;
     KK.state = 'idle';
