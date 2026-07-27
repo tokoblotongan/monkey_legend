@@ -44,9 +44,10 @@ var KK = {
     followDist: 70,      // jarak dasar dari Sun Wukong
     followSpeed: 0.15,
     spriteScale: 1.0,
+    debug: false,         // true = gambar kotak merah di bounds
 
-    // Scale target: 2x Sun Wukong
-    SW_TARGET_RATIO: 0.7, // 2x dari tinggi Sun Wukong
+    // Scale target: 0.7x Sun Wukong (kecil)
+    SW_TARGET_RATIO: 0.7
 
     // Animation config (frames per state)
     anims: {
@@ -102,49 +103,23 @@ function processKingKongSheet(img) {
     var imgData = tx.getImageData(0, 0, sw, sh);
     var pixels = imgData.data;
 
-    // Deteksi frame boundaries dengan analisis kolom
-    var colEdges = [];
-    var prevHadPixel = false;
-    var minGap = sw / 20;
-    var lastEdge = 0;
-
-    for (var cx = 0; cx < sw; cx++) {
-        var hasPixel = false;
-        for (var cy = 0; cy < sh; cy++) {
-            var idx = (cy * sw + cx) * 4;
-            if (pixels[idx + 3] > 30) { hasPixel = true; break; }
-        }
-        if (hasPixel && !prevHadPixel && cx - lastEdge > minGap) {
-            colEdges.push(cx);
-            lastEdge = cx;
-        }
-        prevHadPixel = hasPixel;
-    }
-
-    // Fallback: kalau deteksi gagal, bagi rata 4
-    if (colEdges.length < 4) {
-        var fw = Math.floor(sw / 4);
-        colEdges = [0, fw, fw * 2, fw * 3, sw];
-    } else {
-        colEdges.push(sw);
-    }
-
-    while (colEdges.length < 5) colEdges.push(sw);
-
+    // === SOLUSI: Bagi rata 4 frame horizontal ===
+    var frameW = Math.floor(sw / 4);
     var frames = [];
-    for (var f = 0; f < 4; f++) {
-        var startX = Math.floor(colEdges[f]);
-        var endX = Math.floor(colEdges[f + 1]);
-        if (endX - startX < 10) endX = Math.min(sw, startX + Math.floor(sw / 4));
+    var globalMaxH = 0;
 
-        var minX = endX, maxX = startX, minY = sh, maxY = 0;
+    for (var f = 0; f < 4; f++) {
+        var startX = f * frameW;
+        var endX = (f === 3) ? sw : (f + 1) * frameW;
+
+        // Trim vertikal: cari minY dan maxY yang punya pixel solid
+        var minY = sh, maxY = 0;
         var found = false;
-        for (var px = startX; px < endX; px++) {
-            for (var py = 0; py < sh; py++) {
+
+        for (var py = 0; py < sh; py++) {
+            for (var px = startX; px < endX; px++) {
                 var idx = (py * sw + px) * 4;
-                if (pixels[idx + 3] > 30) {
-                    if (px < minX) minX = px;
-                    if (px > maxX) maxX = px;
+                if (pixels[idx + 3] > 80) { // threshold lebih tinggi, hapus glow tipis
                     if (py < minY) minY = py;
                     if (py > maxY) maxY = py;
                     found = true;
@@ -153,27 +128,36 @@ function processKingKongSheet(img) {
         }
 
         if (!found) {
-            minX = startX; maxX = endX - 1; minY = 0; maxY = sh - 1;
+            // Frame kosong? pakai tengah-tengah gambar
+            minY = Math.floor(sh * 0.1);
+            maxY = Math.floor(sh * 0.9);
         }
 
-        var fw2 = maxX - minX + 1;
+        // Tambah padding 2px biar aman
+        minY = Math.max(0, minY - 2);
+        maxY = Math.min(sh - 1, maxY + 2);
+
         var fh = maxY - minY + 1;
-        var ox = fw2 / 2;
-        var oy = fh;
+        if (fh > globalMaxH) globalMaxH = fh;
+
+        // Anchor: center X, bottom Y (kaki)
+        var ox = frameW / 2;
+        var oy = fh; // anchor di bottom
 
         frames.push({
-            x: minX, y: minY, w: fw2, h: fh,
-            ox: ox, oy: oy,
-            origX: startX, origEndX: endX
+            x: startX,
+            y: minY,
+            w: frameW,
+            h: fh,
+            ox: ox,
+            oy: oy,
+            origX: startX,
+            origEndX: endX
         });
     }
 
-    var maxH = 0;
-    for (var i = 0; i < frames.length; i++) {
-        if (frames[i].h > maxH) maxH = frames[i].h;
-    }
-
-    return { frames: frames, sourceH: maxH };
+    // sourceH = tinggi maksimum setelah trim (konsisten semua frame)
+    return { frames: frames, sourceH: globalMaxH };
 }
 
 // ============================================
@@ -207,8 +191,10 @@ function updateKingKong() {
     kk.spriteScale = calcKKScale();
 
     // === POSISI DASAR: 3-4 langkah di belakang Sun Wukong ===
+    // baseY = kaki player (p.y adalah center, PH/2 = setengah tinggi)
+    var playerFootY = p.y + (window.PH || 38) / 2;
     var baseX = p.x - (kk.followDist * p.facing);
-    var baseY = p.y;
+    var baseY = playerFootY;
 
     // === GERAKAN BRUTAL: kanan-kiri + marah ===
     kk.walkPhase += 0.08;
@@ -535,6 +521,18 @@ function drawKingKong() {
         drawX, drawY, drawW, drawH
     );
 
+    // === DEBUG BOUNDS (kotak merah) ===
+    if (kk.debug) {
+        window.X.strokeStyle = '#FF0000';
+        window.X.lineWidth = 2;
+        window.X.strokeRect(drawX, drawY, drawW, drawH);
+        // Titik anchor
+        window.X.fillStyle = '#00FF00';
+        window.X.beginPath();
+        window.X.arc(0, 0, 4, 0, 6.28);
+        window.X.fill();
+    }
+
     // === ANGRY OVERLAY (mata merah glow) ===
     if (isAngry) {
         window.X.globalCompositeOperation = 'screen';
@@ -585,7 +583,7 @@ function drawKingKongFallback() {
     var kk = KK;
     var sx = kk.x - window.cam.x;
     var sy = kk.y - window.cam.y;
-    var s = 45 * kk.transformScale;
+    var s = 28 * kk.transformScale;
 
     window.X.save();
     window.X.translate(sx, sy);
